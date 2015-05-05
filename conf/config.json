@@ -1,7 +1,14 @@
 {
-  "listen": "eth0",
-  "my_address": "192.168.0.1",
-  "lease_time": 300,
+  "listen on": [
+    "eth0",
+    "eth1.17"
+  ],
+  "my address": "192.168.0.1",
+  "default lease time": 300,
+  "name servers": [
+    "192.168.0.1",
+    "192.168.1.1"
+  ],
   "leases": [
     {
       "DE:AD:BE:EF:00:00": {
