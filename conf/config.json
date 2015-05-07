@@ -1,21 +1,22 @@
 {
-  "listen on": [
-    "eth0",
-    "eth1.17"
-  ],
+  "listen on": "eth0",
   "my address": "192.168.0.1",
   "default lease time": 300,
   "name servers": [
     "192.168.0.1",
     "192.168.1.1"
   ],
-  "leases": [
-    {
-      "DE:AD:BE:EF:00:00": {
-        "ip": "192.168.0.2",
-        "mask": "255.255.255.0",
-        "gateway": "192.168.0.1"
-      }
+  "time offset": 7200,
+  "leases": {
+    "DE:AD:BE:EF:00:00": {
+      "ip": "192.168.0.2/24",
+      "gateway": "192.168.0.1",
+      "host name": "host.local"
+    },
+    "ac:22:0b:7d:f6:e1": {
+      "ip": "109.207.200.222/28",
+      "gateway": "109.207.200.209",
+      "host name": "dmytro-vovk.com"
     }
-  ]
+  }
 }
