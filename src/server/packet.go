@@ -37,10 +37,12 @@ func (dp *DP) OfferResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packe
 	for optionCode, _ := range dp.Dhcp.Options {
 		switch optionCode {
 		case dhcp4.OptionDomainNameServer:
-			options = append(options, dhcp4.Option{
-				Code:  optionCode,
-				Value: []byte(server.config.NameServers[0]),
-			})
+			for _, ns := range server.config.NameServers[0] {
+				options = append(options, dhcp4.Option{
+					Code:  optionCode,
+					Value: []byte(ns),
+				})
+			}
 		case dhcp4.OptionDomainName:
 			if lease.HostName != "" {
 				options = append(options, dhcp4.Option{
