@@ -7,14 +7,15 @@ import (
 )
 
 type RawPacket struct {
-	DhcpType  dhcp4.MessageType
-	SrcMac    [6]byte
-	DstMac    [6]byte
-	SrcIp     net.IP
-	DstIp     net.IP
-	VLan      []uint16
-	EtherType layers.EthernetType
-	Payload   []byte
+	DhcpType   dhcp4.MessageType
+	SrcMac     [6]byte
+	DstMac     [6]byte
+	SrcIp      net.IP
+	DstIp      net.IP
+	Dot1qVLan  uint16
+	Dot1adVLan uint16
+	EtherType  layers.EthernetType
+	Payload    []byte
 }
 
 func (rp *RawPacket) Marshal() []byte {
@@ -28,17 +29,29 @@ func (rp *RawPacket) Marshal() []byte {
 }
 
 func (rp *RawPacket) buildEtherHeader() []byte {
-	if rp.EtherType == 0x8100 {
-		EtherHeader := make([]byte, 12)
+	if rp.EtherType == 0x8100 && rp.Dot1qVLan > 0 {
+		EtherHeader := []byte{
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Dst MAC
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Src MAC
+			0x81, 0x00, // 802.1Q Header
+			byte(rp.Dot1qVLan >> 8), byte(rp.Dot1qVLan), // VLan ID
+			0x08, 0x00, // Ether type
+		}
 		copy(EtherHeader[0:6], rp.DstMac[:])
 		copy(EtherHeader[6:12], rp.SrcMac[:])
-		for _, vid := range rp.VLan {
-			EtherHeader = append(EtherHeader, byte(vid>>8), byte(vid))
-			EtherHeader = append(EtherHeader, 0x81, 0x00)
+		return EtherHeader
+	} else if rp.EtherType == 0x9100 && rp.Dot1adVLan > 0 {
+		EtherHeader := []byte{
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Dst MAC
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Src MAC
+			0x91, 0x00, // 802.1Q Header
+			byte(rp.Dot1adVLan >> 8), byte(rp.Dot1adVLan), // VLan ID
+			0x91, 0x00, // 802.1Q Header
+			byte(rp.Dot1qVLan >> 8), byte(rp.Dot1qVLan), // VLan ID
+			0x08, 0x00, // Ether type
 		}
-		copy(EtherHeader[len(EtherHeader)-2:len(EtherHeader)], []byte{0x08, 0x00})
-		//EtherHeader = append(EtherHeader, 0x08, 0x00)
-		//log.Printf("Ethernet header: %# v", pretty.Formatter(EtherHeader))
+		copy(EtherHeader[0:6], rp.DstMac[:])
+		copy(EtherHeader[6:12], rp.SrcMac[:])
 		return EtherHeader
 	} else {
 		EtherHeader := make([]byte, 14)

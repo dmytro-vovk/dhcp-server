@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"raw_packet"
-	"strings"
 	"syscall"
 )
 
@@ -68,38 +67,18 @@ func (s *DhcpServer) run() {
 			p.SrcMac,
 			p.SrcIP,
 			p.Dhcp.HostName,
-			s.vlanList(p.VLan))
+			s.vlanList(p))
 		s.respond(p)
 	}
-}
-
-func (s *DhcpServer) vlanList(vl []uint16) string {
-	sVlan := make([]string, len(vl))
-	for i, v := range vl {
-		sVlan[i] = fmt.Sprintf("%d", v)
-	}
-	return strings.Join(sVlan, ".")
 }
 
 func (s *DhcpServer) respond(p *DP) {
 	var response *raw_packet.RawPacket
 	switch p.Dhcp.MsgType {
 	case dhcp4.Request:
-		if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-			if p.SrcIP.Equal(lease.Ip) {
-				response = s.sendAck(p, lease)
-			} else {
-				response = s.sendNak(p, lease)
-			}
-		} else {
-			log.Printf("Not offering to %s", p.SrcMac)
-		}
+		response = s.processRequest(p)
 	case dhcp4.Discover:
-		if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-			response = s.sendOffer(p, lease)
-		} else {
-			log.Printf("Not offering to %s", p.SrcMac)
-		}
+		response = s.processDiscover(p)
 	default:
 		log.Printf("Request %s (%d) not yet implemented", s.getMsgTypeName(p.Dhcp.MsgType), p.Dhcp.MsgType)
 	}
@@ -107,7 +86,7 @@ func (s *DhcpServer) respond(p *DP) {
 		log.Printf(
 			"Responding to %s (vlan %s) with %s",
 			p.SrcMac,
-			s.vlanList(p.VLan),
+			s.vlanList(p),
 			s.getMsgTypeName(response.DhcpType),
 		)
 		addr := s.addr
@@ -120,74 +99,74 @@ func (s *DhcpServer) respond(p *DP) {
 		log.Printf(
 			"Not responding to %s (vlan %s) with %s",
 			p.SrcMac,
-			s.vlanList(p.VLan),
+			s.vlanList(p),
 			s.getMsgTypeName(response.DhcpType),
 		)
 	}
 }
 
-func (s *DhcpServer) getMsgTypeName(msgType dhcp4.MessageType) string {
-	switch msgType {
-	case dhcp4.Request:
-		return "Request"
-	case dhcp4.Release:
-		return "Release"
-	case dhcp4.Discover:
-		return "Discover"
-	case dhcp4.ACK:
-		return "ACK"
-	case dhcp4.NAK:
-		return "NAK"
-	case dhcp4.Decline:
-		return "Decline"
-	case dhcp4.Inform:
-		return "Inform"
-	case dhcp4.Offer:
-		return "Offer"
-	default:
-		return "unknown"
+func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
+	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
+		if p.Dhcp.RequestedIp == nil {
+			return s.prepareOffer(p, lease)
+		} else if lease.Ip.Equal(p.Dhcp.RequestedIp) {
+			return s.prepareAck(p, lease)
+		}
+		log.Printf("NAK: client wants %s, got %s", p.Dhcp.RequestedIp, lease.Ip)
+		return s.prepareNak(p, lease)
 	}
+	return nil
 }
 
-func (s *DhcpServer) sendOffer(p *DP, lease config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
+	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
+		return s.prepareOffer(p, lease)
+	}
+	return nil
+}
+
+func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPacket {
 	resp := p.OfferResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.Offer,
-		EtherType: p.EtherType,
-		VLan:      p.VLan,
-		Payload:   []byte(*resp),
-		SrcIp:     s.config.MyAddress,
-		DstIp:     p.SrcIP,
+		DhcpType:   dhcp4.Offer,
+		EtherType:  p.EtherType,
+		Dot1adVLan: p.Dot1adVLan,
+		Dot1qVLan:  p.Dot1qVLan,
+		Payload:    []byte(*resp),
+		SrcIp:      s.config.MyAddress,
+		DstIp:      p.SrcIP,
 	}
 	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
 	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
 	return responsePacket
 }
 
-func (s *DhcpServer) sendAck(p *DP, lease config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket {
 	resp := p.AckResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.ACK,
-		EtherType: p.EtherType,
-		VLan:      p.VLan,
-		Payload:   []byte(*resp),
-		SrcIp:     s.config.MyAddress,
-		DstIp:     p.SrcIP,
+		DhcpType:   dhcp4.ACK,
+		EtherType:  p.EtherType,
+		Dot1adVLan: p.Dot1adVLan,
+		Dot1qVLan:  p.Dot1qVLan,
+		Payload:    []byte(*resp),
+		SrcIp:      s.config.MyAddress,
+		DstIp:      p.Dhcp.RequestedIp,
 	}
 	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
 	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
 	return responsePacket
 }
 
-func (s *DhcpServer) sendNak(p *DP, lease config.Lease) *raw_packet.RawPacket {
-	resp := p.NakResponse(s)
+func (s *DhcpServer) prepareNak(p *DP, lease config.Lease) *raw_packet.RawPacket {
+	resp := p.NakResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.NAK,
-		EtherType: p.EtherType,
-		VLan:      p.VLan,
-		Payload:   []byte(*resp),
-		SrcIp:     s.config.MyAddress,
-		DstIp:     p.SrcIP,
+		DhcpType:   dhcp4.NAK,
+		EtherType:  p.EtherType,
+		Dot1adVLan: p.Dot1adVLan,
+		Dot1qVLan:  p.Dot1qVLan,
+		Payload:    []byte(*resp),
+		SrcIp:      s.config.MyAddress,
+		DstIp:      p.SrcIP,
 	}
 	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
 	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
@@ -200,16 +179,11 @@ func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 	dp.SrcMac = ethernet.SrcMAC
 	dp.DstMac = ethernet.DstMAC
 	dp.EtherType = ethernet.EthernetType
-	if dp.EtherType != 0x800 {
-		var offset int
-		for {
-			dp.VLan = append(dp.VLan, uint16(ethernet.Payload[offset])<<8+uint16(ethernet.Payload[offset+1]))
-			nextType := uint16(ethernet.Payload[offset+2])<<8 + uint16(ethernet.Payload[offset+3])
-			if nextType == 0x800 {
-				break
-			}
-			offset = offset + 4
-		}
+	if dp.EtherType == 0x9100 {
+		dp.Dot1adVLan = uint16(ethernet.Payload[0])<<8 + uint16(ethernet.Payload[1])
+		dp.Dot1qVLan = uint16(ethernet.Payload[4])<<8 + uint16(ethernet.Payload[5])
+	} else if dp.EtherType == 0x8100 {
+		dp.Dot1qVLan = uint16(ethernet.Payload[0])<<8 + uint16(ethernet.Payload[1])
 	}
 	ip := p.NetworkLayer().(*layers.IPv4)
 	dp.SrcIP = ip.SrcIP
@@ -220,7 +194,6 @@ func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 	dp.app = p.ApplicationLayer().Payload()
 	dp.OpCode = dp.app[0]
 	dp.Dhcp.packet = dhcp4.Packet(dp.app)
-	dp.Dhcp.Cookie = dp.Dhcp.packet.Cookie()
 	dp.Dhcp.Options = dp.Dhcp.packet.ParseOptions()
 	if msgType, ok := dp.Dhcp.Options[dhcp4.OptionDHCPMessageType]; ok {
 		if len(msgType) != 1 {
@@ -232,28 +205,15 @@ func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 		dp.Dhcp.HostName = string(hostName)
 	}
 	if requestList, ok := dp.Dhcp.Options[dhcp4.OptionParameterRequestList]; ok {
-		dp.Dhcp.RequestList = requestList
+		dp.Dhcp.RequestList = make([]dhcp4.OptionCode, len(requestList))
+		for i, code := range requestList {
+			dp.Dhcp.RequestList[i] = dhcp4.OptionCode(code)
+		}
 	}
 	if requestedIp, ok := dp.Dhcp.Options[dhcp4.OptionRequestedIPAddress]; ok {
 		if len(requestedIp) == 4 {
-			dp.Dhcp.RequestedIp = net.IPv4(requestedIp[0], requestedIp[1], requestedIp[2], requestedIp[3]).String()
+			dp.Dhcp.RequestedIp = net.IPv4(requestedIp[0], requestedIp[1], requestedIp[2], requestedIp[3])
 		}
 	}
 	return dp, nil
-}
-
-func (s *DhcpServer) getIfIndex(name string) int {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		panic(err)
-	}
-	return iface.Index
-}
-
-func (s *DhcpServer) getIfMac(name string) net.HardwareAddr {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		panic(err)
-	}
-	return iface.HardwareAddr
 }

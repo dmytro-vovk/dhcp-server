@@ -188,11 +188,11 @@ func ReplyPacket(req Packet, mt MessageType, serverId, yIAddr net.IP, leaseDurat
 
 // PadToMinSize pads a packet so that when sent over UDP, the entire packet,
 // is 300 bytes (BOOTP min), to be compatible with really old devices.
-var padder [272]byte
+var padder [300]byte
 
 func (p *Packet) PadToMinSize() {
-	if n := len(*p); n < 272 {
-		*p = append(*p, padder[:272-n]...)
+	if n := len(*p); n < 300 {
+		*p = append(*p, padder[:300-n]...)
 	}
 }
 

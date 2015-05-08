@@ -2,6 +2,7 @@
   "listen on": "eth0",
   "my address": "192.168.0.1",
   "default lease time": 300,
+  "default mtu": 1500,
   "name servers": [
     "192.168.0.1",
     "192.168.1.1"
@@ -11,7 +12,8 @@
     "DE:AD:BE:EF:00:00": {
       "ip": "192.168.0.2/24",
       "gateway": "192.168.0.1",
-      "host name": "host.local"
+      "host name": "host.local",
+      "mtu": 1450
     },
     "ac:22:0b:7d:f6:e1": {
       "ip": "109.207.200.222/28",
