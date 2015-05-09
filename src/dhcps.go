@@ -2,6 +2,7 @@ package main
 
 import (
 	"config"
+	"flag"
 	"log"
 	"server"
 )
@@ -9,14 +10,15 @@ import (
 var conf *config.ServerConfig
 
 func init() {
+	configFile := flag.String("config", "/etc/deep-dhcp/config.json", "Path to config file")
+	flag.Parse()
 	log.Print("Starting Deep DHCP Server...")
 	var err error
-	configFile := "../conf/config.json"
-	conf, err = config.Read(configFile)
+	conf, err = config.Read(*configFile)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	log.Printf("Config read from %s", configFile)
+	log.Printf("Config read from %s", *configFile)
 }
 
 func main() {

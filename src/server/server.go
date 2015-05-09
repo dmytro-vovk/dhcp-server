@@ -97,19 +97,18 @@ func (s *DhcpServer) respond(p *DP) {
 		}
 	} else {
 		log.Printf(
-			"Not responding to %s (vlan %s) with %s",
+			"Not responding to %s (vlan %s)",
 			p.SrcMac,
 			s.vlanList(p),
-			s.getMsgTypeName(response.DhcpType),
 		)
 	}
 }
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-		if p.Dhcp.RequestedIp == nil {
+		if p.Dhcp.packet.CIAddr() == nil {
 			return s.prepareOffer(p, lease)
-		} else if lease.Ip.Equal(p.Dhcp.RequestedIp) {
+		} else if lease.Ip.Equal(p.Dhcp.packet.CIAddr()) {
 			return s.prepareAck(p, lease)
 		}
 		log.Printf("NAK: client wants %s, got %s", p.Dhcp.RequestedIp, lease.Ip)
@@ -150,7 +149,7 @@ func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket
 		Dot1qVLan:  p.Dot1qVLan,
 		Payload:    []byte(*resp),
 		SrcIp:      s.config.MyAddress,
-		DstIp:      p.Dhcp.RequestedIp,
+		DstIp:      p.Dhcp.packet.CIAddr(),
 	}
 	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
 	copy(responsePacket.DstMac[:], p.SrcMac[0:8])

@@ -42,10 +42,10 @@ func (p Packet) CHAddr() net.HardwareAddr {
 
 // 192 bytes of zeros BOOTP legacy
 
-// BOOTP legacy
+// Get server name
 func (p Packet) SName() []byte { return trimNull(p[44:108]) }
 
-// BOOTP legacy
+// Get boot image file name
 func (p Packet) File() []byte { return trimNull(p[108:236]) }
 
 func trimNull(d []byte) []byte {
@@ -67,29 +67,53 @@ func (p Packet) Options() []byte {
 
 func (p Packet) Broadcast() bool { return p.Flags()[0] > 127 }
 
+// Set broadcast flag
 func (p Packet) SetBroadcast(broadcast bool) {
 	if p.Broadcast() != broadcast {
 		p.Flags()[0] ^= 128
 	}
 }
 
+// Set message type: request (1) or reply (2)
 func (p Packet) SetOpCode(c OpCode) { p[0] = byte(c) }
+
+// Set client hardware (MAC) address
 func (p Packet) SetCHAddr(a net.HardwareAddr) {
 	copy(p[28:44], a)
 	p[2] = byte(len(a))
 }
-func (p Packet) SetHType(hType byte)     { p[1] = hType }
-func (p Packet) SetCookie(cookie []byte) { copy(p.Cookie(), cookie) }
-func (p Packet) SetHops(hops byte)       { p[3] = hops }
-func (p Packet) SetXId(xId []byte)       { copy(p.XId(), xId) }
-func (p Packet) SetSecs(secs []byte)     { copy(p.Secs(), secs) }
-func (p Packet) SetFlags(flags []byte)   { copy(p.Flags(), flags) }
-func (p Packet) SetCIAddr(ip net.IP)     { copy(p.CIAddr(), ip.To4()) }
-func (p Packet) SetYIAddr(ip net.IP)     { copy(p.YIAddr(), ip.To4()) }
-func (p Packet) SetSIAddr(ip net.IP)     { copy(p.SIAddr(), ip.To4()) }
-func (p Packet) SetGIAddr(ip net.IP)     { copy(p.GIAddr(), ip.To4()) }
 
-// BOOTP legacy
+// Set hardware address type
+func (p Packet) SetHType(hType byte) { p[1] = hType }
+
+// Set DHCP transaction id
+func (p Packet) SetCookie(cookie []byte) { copy(p.Cookie(), cookie) }
+
+// Set relay hops count
+func (p Packet) SetHops(hops byte) { p[3] = hops }
+
+// Set transaction id
+func (p Packet) SetXId(xId []byte) { copy(p.XId(), xId) }
+
+// Set seconds since the client has begun address acquisition
+func (p Packet) SetSecs(secs []byte) { copy(p.Secs(), secs) }
+
+// Set flags
+func (p Packet) SetFlags(flags []byte) { copy(p.Flags(), flags) }
+
+// Set client IP address. Only for clients in BOUND, RENEW, or REBINDING state.
+func (p Packet) SetCIAddr(ip net.IP) { copy(p.CIAddr(), ip.To4()) }
+
+// Set client ('your') IP address
+func (p Packet) SetYIAddr(ip net.IP) { copy(p.YIAddr(), ip.To4()) }
+
+// Set IP of next DHCP server. Return in OFFER and ACK responses.
+func (p Packet) SetSIAddr(ip net.IP) { copy(p.SIAddr(), ip.To4()) }
+
+// Set relay agent IP address
+func (p Packet) SetGIAddr(ip net.IP) { copy(p.GIAddr(), ip.To4()) }
+
+// Set server host name, null terminated
 func (p Packet) SetSName(sName []byte) {
 	copy(p[44:108], sName)
 	if len(sName) < 64 {
@@ -97,7 +121,7 @@ func (p Packet) SetSName(sName []byte) {
 	}
 }
 
-// BOOTP legacy
+// Set boot file name
 func (p Packet) SetFile(file []byte) {
 	copy(p[108:236], file)
 	if len(file) < 128 {
@@ -188,10 +212,9 @@ func ReplyPacket(req Packet, mt MessageType, serverId, yIAddr net.IP, leaseDurat
 
 // PadToMinSize pads a packet so that when sent over UDP, the entire packet,
 // is 300 bytes (BOOTP min), to be compatible with really old devices.
-var padder [300]byte
-
 func (p *Packet) PadToMinSize() {
 	if n := len(*p); n < 300 {
+		var padder [300]byte
 		*p = append(*p, padder[:300-n]...)
 	}
 }
@@ -318,6 +341,8 @@ const (
 	OptionDomainSearchList OptionCode = 119
 
 	OptionClasslessRouteFormat OptionCode = 121
+
+	OptionMicrosoftClasslessStaticRoute OptionCode = 252
 )
 
 /* Notes

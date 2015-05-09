@@ -22,10 +22,25 @@ func (rp *RawPacket) Marshal() []byte {
 	EtherHeader := rp.buildEtherHeader()
 	IPv4Header := rp.buildIPv4Header()
 	UDPHeader := rp.buildUDPHeader()
-	//log.Printf("Ethernet header: %# v", pretty.Formatter(EtherHeader))
-	//log.Printf("IPv4 header: %# v", pretty.Formatter(IPv4Header))
-	//log.Printf("UDP header: %# v", pretty.Formatter(UDPHeader))
-	return append(EtherHeader, append(IPv4Header, append(UDPHeader, rp.Payload...)...)...)
+	//log.Printf("-------------------------------------------")
+	//log.Printf("Ethernet header:\n%# v", pretty.Formatter(EtherHeader))
+	//log.Printf("IPv4 header:\n%# v", pretty.Formatter(IPv4Header))
+	//log.Printf("UDP header:\n%# v", pretty.Formatter(UDPHeader))
+	//log.Printf("Payload:\n%# v", pretty.Formatter(rp.Payload))
+	eEther := len(EtherHeader)
+	eIPv4 := len(IPv4Header)
+	eUDP := len(UDPHeader)
+	ePayload := len(rp.Payload)
+	//log.Printf("Len: ether %d, ipv4 %d, udp %d, payload %d: %d", eEther, eIPv4, eUDP, ePayload, eEther+eIPv4+eUDP+ePayload)
+	pkt := make([]byte, eEther+eIPv4+eUDP+ePayload)
+	copy(pkt[0:], EtherHeader[:])
+	copy(pkt[eEther:eEther+eIPv4], IPv4Header[:])
+	copy(pkt[eEther+eIPv4:eEther+eIPv4+eUDP], UDPHeader[:])
+	copy(pkt[eEther+eIPv4+eUDP:eEther+eIPv4+eUDP+ePayload], rp.Payload[:])
+	//log.Printf("Resulting packet:\n%# v", pretty.Formatter(pkt))
+	//log.Printf("Resulting packet length: %d", len(pkt))
+	//log.Printf("-------------------------------------------")
+	return pkt
 }
 
 func (rp *RawPacket) buildEtherHeader() []byte {
@@ -84,16 +99,18 @@ func (rp *RawPacket) buildIPv4Header() []byte {
 }
 
 func (rp *RawPacket) buildUDPHeader() []byte {
-	UDPHeader := make([]byte, 8)
+	if len(rp.Payload)|1 == 1 {
+		rp.Payload = append(rp.Payload, 0)
+	}
 	payloadCheckSum := rp.csum(rp.Payload)
-	UDPHeader[0] = 0                          // Source Port
-	UDPHeader[1] = 67                         // ...
-	UDPHeader[2] = 0                          // Destination Port
-	UDPHeader[3] = 68                         // ...
-	UDPHeader[4] = byte(len(rp.Payload) >> 8) // Length
-	UDPHeader[5] = byte(len(rp.Payload))      // ...
-	UDPHeader[6] = byte(payloadCheckSum >> 8) // Payload checksum
-	UDPHeader[7] = byte(payloadCheckSum)      // ...
+	UDPHeader := []byte{
+		0, 67, // Source Port
+		0, 68, // Destination Port
+		byte(len(rp.Payload) >> 8), // Length
+		byte(len(rp.Payload)),      // ...
+		byte(payloadCheckSum >> 8), // Payload checksum
+		byte(payloadCheckSum),      // ...
+	}
 	return UDPHeader
 }
 
