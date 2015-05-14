@@ -134,9 +134,9 @@ func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPack
 		Payload:    []byte(*resp),
 		SrcIp:      s.config.MyAddress,
 		DstIp:      p.SrcIP,
+		DstMac:     p.SrcMac,
+		SrcMac:     s.config.MyMac,
 	}
-	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
-	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
 	return responsePacket
 }
 
@@ -150,9 +150,9 @@ func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket
 		Payload:    []byte(*resp),
 		SrcIp:      s.config.MyAddress,
 		DstIp:      p.Dhcp.packet.CIAddr(),
+		DstMac:     p.SrcMac,
+		SrcMac:     s.config.MyMac,
 	}
-	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
-	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
 	return responsePacket
 }
 
@@ -166,9 +166,9 @@ func (s *DhcpServer) prepareNak(p *DP, lease config.Lease) *raw_packet.RawPacket
 		Payload:    []byte(*resp),
 		SrcIp:      s.config.MyAddress,
 		DstIp:      p.SrcIP,
+		DstMac:     p.SrcMac,
+		SrcMac:     s.config.MyMac,
 	}
-	copy(responsePacket.SrcMac[:], s.config.MyMac[0:8])
-	copy(responsePacket.DstMac[:], p.SrcMac[0:8])
 	return responsePacket
 }
 
