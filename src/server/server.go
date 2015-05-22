@@ -1,9 +1,9 @@
 package server
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcap"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"config"
 	"dhcp4"
 	"errors"
@@ -84,10 +84,10 @@ func (s *DhcpServer) respond(p *DP) {
 	}
 	if response != nil {
 		log.Printf(
-			"Responding to %s (vlan %s) with %s",
+			"%s to %s (vlan %s)",
+			s.getMsgTypeName(response.DhcpType),
 			p.SrcMac,
 			s.vlanList(p),
-			s.getMsgTypeName(response.DhcpType),
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])

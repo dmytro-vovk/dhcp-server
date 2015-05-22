@@ -1,7 +1,7 @@
 package server
 
 import (
-	"code.google.com/p/gopacket/layers"
+	"github.com/google/gopacket/layers"
 	"config"
 	"dhcp4"
 	"log"

@@ -1,9 +1,9 @@
 package raw_packet
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 	"dhcp4"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"log"
 	"net"
 )
@@ -51,14 +51,27 @@ func (rp *RawPacket) Marshal() []byte {
 }
 
 func (rp *RawPacket) buildDot1QHeader() []layers.Dot1Q {
-	ls := []layers.Dot1Q{}
-	for _, v := range rp.VLan {
-		ls = append(ls, layers.Dot1Q{
-			VLANIdentifier: v,
-			Type:           layers.EthernetTypeIPv4,
-		})
+	if len(rp.VLan) == 2 {
+		return []layers.Dot1Q{
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[0],
+				Type:           layers.EthernetTypeDot1Q,
+			},
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[1],
+				Type:           layers.EthernetTypeIPv4,
+			},
+		}
+	} else if len(rp.VLan) == 1 {
+		return []layers.Dot1Q{
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[0],
+				Type:           layers.EthernetTypeIPv4,
+			},
+		}
+	} else {
+		return []layers.Dot1Q{}
 	}
-	return ls
 }
 
 func (rp *RawPacket) buildEtherHeader(etherType layers.EthernetType) layers.Ethernet {
