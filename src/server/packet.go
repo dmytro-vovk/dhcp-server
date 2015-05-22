@@ -12,8 +12,7 @@ type DP struct {
 	SrcMac     net.HardwareAddr
 	DstMac     net.HardwareAddr
 	EtherType  layers.EthernetType
-	Dot1adVLan uint16
-	Dot1qVLan  uint16
+	VLan       []uint16
 	SrcIP      net.IP
 	DstIP      net.IP
 	SrcPort    layers.UDPPort

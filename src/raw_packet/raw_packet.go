@@ -9,15 +9,14 @@ import (
 )
 
 type RawPacket struct {
-	DhcpType   dhcp4.MessageType
-	SrcMac     net.HardwareAddr
-	DstMac     net.HardwareAddr
-	SrcIp      net.IP
-	DstIp      net.IP
-	Dot1qVLan  uint16
-	Dot1adVLan uint16
-	EtherType  layers.EthernetType
-	Payload    []byte
+	DhcpType  dhcp4.MessageType
+	SrcMac    net.HardwareAddr
+	DstMac    net.HardwareAddr
+	SrcIp     net.IP
+	DstIp     net.IP
+	VLan      []uint16
+	EtherType layers.EthernetType
+	Payload   []byte
 }
 
 func (rp *RawPacket) Marshal() []byte {
@@ -34,8 +33,12 @@ func (rp *RawPacket) Marshal() []byte {
 	if rp.EtherType == layers.EthernetTypeIPv4 {
 		err = gopacket.SerializeLayers(buf, opts, &ether, &ip, &udp, gopacket.Payload(rp.Payload))
 	} else if rp.EtherType == layers.EthernetTypeDot1Q {
-		dot1q := rp.buildDot1QHeader()
-		err = gopacket.SerializeLayers(buf, opts, &ether, &dot1q, &ip, &udp, gopacket.Payload(rp.Payload))
+		lss := []gopacket.SerializableLayer{&ether}
+		for _, dot1 := range rp.buildDot1QHeader() {
+			lss = append(lss, &dot1)
+		}
+		lss = append(lss, &ip, &udp, gopacket.Payload(rp.Payload))
+		err = gopacket.SerializeLayers(buf, opts, lss...)
 	} else {
 		log.Printf("Unsupported ethernet type %x", rp.EtherType)
 		return []byte{}
@@ -46,11 +49,15 @@ func (rp *RawPacket) Marshal() []byte {
 	return buf.Bytes()
 }
 
-func (rp *RawPacket) buildDot1QHeader() layers.Dot1Q {
-	return layers.Dot1Q{
-		VLANIdentifier: rp.Dot1qVLan,
-		Type:           layers.EthernetTypeIPv4,
+func (rp *RawPacket) buildDot1QHeader() []layers.Dot1Q {
+	ls := []layers.Dot1Q{}
+	for _, v := range rp.VLan {
+		ls = append(ls, layers.Dot1Q{
+			VLANIdentifier: v,
+			Type:           layers.EthernetTypeIPv4,
+		})
 	}
+	return ls
 }
 
 func (rp *RawPacket) buildEtherHeader(etherType layers.EthernetType) layers.Ethernet {
