@@ -6,7 +6,6 @@ import (
 	"dhcp4"
 	"log"
 	"net"
-	"github.com/kr/pretty"
 )
 
 type RawPacket struct {
@@ -35,11 +34,11 @@ func (rp *RawPacket) Marshal() []byte {
 		err = gopacket.SerializeLayers(buf, opts, &ether, &ip, &udp, gopacket.Payload(rp.Payload))
 	} else if rp.EtherType == layers.EthernetTypeDot1Q {
 		lss := []gopacket.SerializableLayer{&ether}
-		for _, dot1 := range rp.buildDot1QHeader() {
-			lss = append(lss, &dot1)
+		dot1layers := rp.buildDot1QHeader()
+		for k := range dot1layers {
+			lss = append(lss, &dot1layers[k])
 		}
 		lss = append(lss, &ip, &udp, gopacket.Payload(rp.Payload))
-		log.Printf("Layers out:\n%# v", pretty.Formatter(lss))
 		err = gopacket.SerializeLayers(buf, opts, lss...)
 	} else {
 		log.Printf("Unsupported ethernet type %x", rp.EtherType)
