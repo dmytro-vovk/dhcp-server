@@ -36,7 +36,7 @@ func (s *DhcpServer) Run() {
 	var err error
 	if s.handle, err = pcap.OpenLive(s.config.Listen, 1600, true, 0); err != nil {
 		log.Fatalf("Error opening live interface: %s", err)
-	} else if err := s.handle.SetBPFFilter("vlan and udp and dst port 67"); err != nil {
+	} else if err := s.handle.SetBPFFilter("(udp and dst port 67) or (vlan and udp and dst port 67)"); err != nil {
 		log.Fatalf("Error setting BPF filter: %s", err)
 	} else {
 		s.fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
