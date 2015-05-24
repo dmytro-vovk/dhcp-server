@@ -120,6 +120,13 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	return nil
 }
 
+func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
+	if lease := s.getLease(p); lease != nil {
+		return s.prepareOffer(p, lease)
+	}
+	return nil
+}
+
 func (s *DhcpServer) getLease(p *DP) *config.Lease {
 	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
 		return &lease
@@ -132,13 +139,6 @@ func (s *DhcpServer) getLease(p *DP) *config.Lease {
 	v.Set(p.VLan, nil)
 	if lease, ok := s.config.VLans[v]; ok {
 		return &lease
-	}
-	return nil
-}
-
-func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
-	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-		return s.prepareOffer(p, &lease)
 	}
 	return nil
 }
