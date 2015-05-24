@@ -1,23 +1,22 @@
 package raw_packet
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
 	"github.com/krolaw/dhcp4"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 	"log"
 	"net"
 )
 
 type RawPacket struct {
-	DhcpType   dhcp4.MessageType
-	SrcMac     net.HardwareAddr
-	DstMac     net.HardwareAddr
-	SrcIp      net.IP
-	DstIp      net.IP
-	Dot1qVLan  uint16
-	Dot1adVLan uint16
-	EtherType  layers.EthernetType
-	Payload    []byte
+	DhcpType  dhcp4.MessageType
+	SrcMac    net.HardwareAddr
+	DstMac    net.HardwareAddr
+	SrcIp     net.IP
+	DstIp     net.IP
+	VLan      []uint16
+	EtherType layers.EthernetType
+	Payload   []byte
 }
 
 func (rp *RawPacket) Marshal() []byte {
@@ -34,8 +33,13 @@ func (rp *RawPacket) Marshal() []byte {
 	if rp.EtherType == layers.EthernetTypeIPv4 {
 		err = gopacket.SerializeLayers(buf, opts, &ether, &ip, &udp, gopacket.Payload(rp.Payload))
 	} else if rp.EtherType == layers.EthernetTypeDot1Q {
-		dot1q := rp.buildDot1QHeader()
-		err = gopacket.SerializeLayers(buf, opts, &ether, &dot1q, &ip, &udp, gopacket.Payload(rp.Payload))
+		lss := []gopacket.SerializableLayer{&ether}
+		dot1layers := rp.buildDot1QHeader()
+		for k := range dot1layers {
+			lss = append(lss, &dot1layers[k])
+		}
+		lss = append(lss, &ip, &udp, gopacket.Payload(rp.Payload))
+		err = gopacket.SerializeLayers(buf, opts, lss...)
 	} else {
 		log.Printf("Unsupported ethernet type %x", rp.EtherType)
 		return []byte{}
@@ -46,10 +50,27 @@ func (rp *RawPacket) Marshal() []byte {
 	return buf.Bytes()
 }
 
-func (rp *RawPacket) buildDot1QHeader() layers.Dot1Q {
-	return layers.Dot1Q{
-		VLANIdentifier: rp.Dot1qVLan,
-		Type:           layers.EthernetTypeIPv4,
+func (rp *RawPacket) buildDot1QHeader() []layers.Dot1Q {
+	if len(rp.VLan) == 2 {
+		return []layers.Dot1Q{
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[0],
+				Type:           layers.EthernetTypeDot1Q,
+			},
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[1],
+				Type:           layers.EthernetTypeIPv4,
+			},
+		}
+	} else if len(rp.VLan) == 1 {
+		return []layers.Dot1Q{
+			layers.Dot1Q{
+				VLANIdentifier: rp.VLan[0],
+				Type:           layers.EthernetTypeIPv4,
+			},
+		}
+	} else {
+		return []layers.Dot1Q{}
 	}
 }
 

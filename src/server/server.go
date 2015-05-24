@@ -1,9 +1,9 @@
 package server
 
 import (
-	"code.google.com/p/gopacket"
-	"code.google.com/p/gopacket/layers"
-	"code.google.com/p/gopacket/pcap"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"config"
 	"errors"
 	"fmt"
@@ -36,7 +36,7 @@ func (s *DhcpServer) Run() {
 	var err error
 	if s.handle, err = pcap.OpenLive(s.config.Listen, 1600, true, 0); err != nil {
 		log.Fatalf("Error opening live interface: %s", err)
-	} else if err := s.handle.SetBPFFilter("udp and dst port 67"); err != nil {
+	} else if err := s.handle.SetBPFFilter("(udp and dst port 67) or (vlan and udp and dst port 67)"); err != nil {
 		log.Fatalf("Error setting BPF filter: %s", err)
 	} else {
 		s.fd, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.IPPROTO_RAW)
@@ -84,10 +84,11 @@ func (s *DhcpServer) respond(p *DP) {
 	}
 	if response != nil {
 		log.Printf(
-			"Responding to %s (vlan %s) with %s",
+			"%s to %s (vlan %s)",
+			s.getMsgTypeName(response.DhcpType),
 			p.SrcMac,
 			s.vlanList(p),
-			response.DhcpType,
+			s.getMsgTypeName(response.DhcpType),
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])
@@ -110,6 +111,8 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 			return s.prepareOffer(p, lease)
 		} else if lease.Ip.Equal(p.Dhcp.packet.CIAddr()) {
 			return s.prepareAck(p, lease)
+		} else if lease.Ip.Equal(p.Dhcp.RequestedIp) {
+			return s.prepareAck(p, lease)
 		}
 		log.Printf("NAK: client wants %s, got %s", p.Dhcp.RequestedIp, lease.Ip)
 		return s.prepareNak(p, lease)
@@ -127,15 +130,14 @@ func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
 func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPacket {
 	resp := p.OfferResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:   dhcp4.Offer,
-		EtherType:  p.EtherType,
-		Dot1adVLan: p.Dot1adVLan,
-		Dot1qVLan:  p.Dot1qVLan,
-		Payload:    []byte(*resp),
-		SrcIp:      s.config.MyAddress,
-		DstIp:      p.SrcIP,
-		DstMac:     p.SrcMac,
-		SrcMac:     s.config.MyMac,
+		DhcpType:  dhcp4.Offer,
+		EtherType: p.EtherType,
+		VLan:      p.VLan,
+		Payload:   []byte(*resp),
+		SrcIp:     s.config.MyAddress,
+		DstIp:     p.SrcIP,
+		DstMac:    p.SrcMac,
+		SrcMac:    s.config.MyMac,
 	}
 	return responsePacket
 }
@@ -143,15 +145,14 @@ func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPack
 func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket {
 	resp := p.AckResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:   dhcp4.ACK,
-		EtherType:  p.EtherType,
-		Dot1adVLan: p.Dot1adVLan,
-		Dot1qVLan:  p.Dot1qVLan,
-		Payload:    []byte(*resp),
-		SrcIp:      s.config.MyAddress,
-		DstIp:      p.Dhcp.packet.CIAddr(),
-		DstMac:     p.SrcMac,
-		SrcMac:     s.config.MyMac,
+		DhcpType:  dhcp4.ACK,
+		EtherType: p.EtherType,
+		VLan:      p.VLan,
+		Payload:   []byte(*resp),
+		SrcIp:     s.config.MyAddress,
+		DstIp:     p.Dhcp.packet.CIAddr(),
+		DstMac:    p.SrcMac,
+		SrcMac:    s.config.MyMac,
 	}
 	return responsePacket
 }
@@ -159,15 +160,14 @@ func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket
 func (s *DhcpServer) prepareNak(p *DP, lease config.Lease) *raw_packet.RawPacket {
 	resp := p.NakResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:   dhcp4.NAK,
-		EtherType:  p.EtherType,
-		Dot1adVLan: p.Dot1adVLan,
-		Dot1qVLan:  p.Dot1qVLan,
-		Payload:    []byte(*resp),
-		SrcIp:      s.config.MyAddress,
-		DstIp:      p.SrcIP,
-		DstMac:     p.SrcMac,
-		SrcMac:     s.config.MyMac,
+		DhcpType:  dhcp4.NAK,
+		EtherType: p.EtherType,
+		VLan:      p.VLan,
+		Payload:   []byte(*resp),
+		SrcIp:     s.config.MyAddress,
+		DstIp:     p.SrcIP,
+		DstMac:    p.SrcMac,
+		SrcMac:    s.config.MyMac,
 	}
 	return responsePacket
 }
@@ -178,11 +178,10 @@ func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 	dp.SrcMac = ethernet.SrcMAC
 	dp.DstMac = ethernet.DstMAC
 	dp.EtherType = ethernet.EthernetType
-	if dp.EtherType == 0x9100 {
-		dp.Dot1adVLan = uint16(ethernet.Payload[0])<<8 + uint16(ethernet.Payload[1])
-		dp.Dot1qVLan = uint16(ethernet.Payload[4])<<8 + uint16(ethernet.Payload[5])
-	} else if dp.EtherType == 0x8100 {
-		dp.Dot1qVLan = uint16(ethernet.Payload[0])<<8 + uint16(ethernet.Payload[1])
+	for _, l := range p.Layers() {
+		if l.LayerType() == layers.LayerTypeDot1Q {
+			dp.VLan = append(dp.VLan, uint16(l.LayerContents()[0])<<8+uint16(l.LayerContents()[1]))
+		}
 	}
 	ip := p.NetworkLayer().(*layers.IPv4)
 	dp.SrcIP = ip.SrcIP

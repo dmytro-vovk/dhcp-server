@@ -3,13 +3,18 @@ package server
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 func (s *DhcpServer) vlanList(p *DP) string {
-	if p.Dot1adVLan > 0 {
-		return fmt.Sprintf("%d.%d", p.Dot1adVLan, p.Dot1qVLan)
+	if len(p.VLan) > 0 {
+		list := []string{}
+		for _, v := range p.VLan {
+			list = append(list, fmt.Sprintf("%d", v))
+		}
+		return strings.Join(list, ".")
 	} else {
-		return fmt.Sprintf("%d", p.Dot1qVLan)
+		return "0"
 	}
 }
 
