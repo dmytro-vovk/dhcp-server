@@ -10,12 +10,12 @@ import (
 )
 
 type rawServerConfig struct {
-	Listen     string              `json:"listen on"`
-	MyAddress  string              `json:"my address"`
-	LeaseTime  uint                `json:"default lease time"`
-	NameServer string              `json:"name server"`
-	TimeOffset uint16              `json:"time offset"`
-	Leases     map[string]rawLease `json:"leases"`
+	Listen      string              `json:"listen on"`
+	MyAddress   string              `json:"my address"`
+	LeaseTime   uint                `json:"default lease time"`
+	NameServers []string            `json:"name servers"`
+	TimeOffset  uint16              `json:"time offset"`
+	Leases      map[string]rawLease `json:"leases"`
 }
 
 type rawLease struct {
@@ -25,13 +25,13 @@ type rawLease struct {
 }
 
 type ServerConfig struct {
-	Listen     string
-	MyAddress  net.IP
-	MyMac      net.HardwareAddr
-	LeaseTime  time.Duration
-	NameServer net.IP
-	TimeOffset uint16
-	Leases     map[string]Lease
+	Listen      string
+	MyAddress   net.IP
+	MyMac       net.HardwareAddr
+	LeaseTime   time.Duration
+	NameServers []byte
+	TimeOffset  uint16
+	Leases      map[string]Lease
 }
 
 type Lease struct {
@@ -63,7 +63,13 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		MyAddress:  net.ParseIP(c.MyAddress).To4(),
 		TimeOffset: c.TimeOffset,
 	}
-	conf.NameServer = net.ParseIP(c.NameServer).To4()
+	for _, ns := range c.NameServers {
+		if nsIp := net.ParseIP(ns); nsIp != nil {
+			conf.NameServers = append(conf.NameServers, nsIp.To4()...)
+		} else {
+			log.Fatalf("Invalid nameserver adddress: %s", nsIp)
+		}
+	}
 	for mac, lease := range c.Leases {
 		if len(lease.HostName) > 11 {
 			log.Fatalf("Host name is too long (max 11 bytes): %s", lease.HostName)

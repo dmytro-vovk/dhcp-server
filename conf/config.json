@@ -2,7 +2,10 @@
   "listen on": "eth0",
   "my address": "109.207.200.209",
   "default lease time": 600,
-  "name server": "109.207.200.209",
+  "name servers": [
+    "109.207.200.209",
+    "8.8.8.8"
+  ],
   "leases": {
     "DE:AD:BE:EF:00:00": {
       "ip": "192.168.0.2/24",

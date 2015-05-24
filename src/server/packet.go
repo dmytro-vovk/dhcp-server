@@ -3,7 +3,7 @@ package server
 import (
 	"code.google.com/p/gopacket/layers"
 	"config"
-	"dhcp4"
+	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 )
@@ -34,7 +34,7 @@ func (dp *DP) getOptions(p dhcp4.Packet, lease config.Lease, server *DhcpServer)
 	options := dhcp4.Options{
 		dhcp4.OptionSubnetMask:       []byte(lease.Mask),
 		dhcp4.OptionRouter:           []byte(lease.Gateway),
-		dhcp4.OptionDomainNameServer: []byte(server.config.NameServer),
+		dhcp4.OptionDomainNameServer: []byte(server.config.NameServers),
 	}
 	for _, opt := range dp.Dhcp.Options[dhcp4.OptionParameterRequestList] {
 		optionCode := dhcp4.OptionCode(opt)
@@ -48,7 +48,6 @@ func (dp *DP) getOptions(p dhcp4.Packet, lease config.Lease, server *DhcpServer)
 			options[optionCode] = []byte(lease.Broadcast)
 		case dhcp4.OptionInterfaceMTU:
 		case dhcp4.OptionTimeOffset:
-		case dhcp4.OptionDomainSearchList:
 		case dhcp4.OptionNetBIOSOverTCPIPNameServer:
 		case dhcp4.OptionNetBIOSOverTCPIPScope:
 		case dhcp4.OptionNetworkTimeProtocolServers:

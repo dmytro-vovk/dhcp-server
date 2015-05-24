@@ -5,9 +5,9 @@ import (
 	"code.google.com/p/gopacket/layers"
 	"code.google.com/p/gopacket/pcap"
 	"config"
-	"dhcp4"
 	"errors"
 	"fmt"
+	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 	"raw_packet"
@@ -63,7 +63,7 @@ func (s *DhcpServer) run() {
 		}
 		log.Printf(
 			"%s from mac %s, ip %s, host %s, vlan %s",
-			s.getMsgTypeName(p.Dhcp.MsgType),
+			p.Dhcp.MsgType,
 			p.SrcMac,
 			p.SrcIP,
 			p.Dhcp.HostName,
@@ -80,14 +80,14 @@ func (s *DhcpServer) respond(p *DP) {
 	case dhcp4.Discover:
 		response = s.processDiscover(p)
 	default:
-		log.Printf("Request %s (%d) not yet implemented", s.getMsgTypeName(p.Dhcp.MsgType), p.Dhcp.MsgType)
+		log.Printf("Request %s (%d) not yet implemented", p.Dhcp.MsgType, p.Dhcp.MsgType)
 	}
 	if response != nil {
 		log.Printf(
 			"Responding to %s (vlan %s) with %s",
 			p.SrcMac,
 			s.vlanList(p),
-			s.getMsgTypeName(response.DhcpType),
+			response.DhcpType,
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])

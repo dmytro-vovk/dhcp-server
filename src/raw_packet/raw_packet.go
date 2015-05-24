@@ -3,7 +3,7 @@ package raw_packet
 import (
 	"code.google.com/p/gopacket"
 	"code.google.com/p/gopacket/layers"
-	"dhcp4"
+	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 )
