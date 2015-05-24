@@ -7,20 +7,27 @@
     "8.8.8.8"
   ],
   "leases": {
-    "DE:AD:BE:EF:00:00": {
+    "host.local": {
       "ip": "192.168.0.2/24",
       "gateway": "192.168.0.1",
-      "host name": "host.local"
+      "mac": "DE:AD:BE:EF:00:00",
+      "vlan": ""
     },
-    "ac:22:0b:7d:f6:e1": {
+    "wolf.local": {
       "ip": "109.207.200.222/28",
       "gateway": "109.207.200.209",
-      "host name": "wolf.local"
+      "mac": "ac:22:0b:7d:f6:e1"
     },
-    "d4:3d:7e:34:af:f3": {
+    "office": {
       "ip": "192.168.0.23/24",
       "gateway": "109.207.200.209",
-      "host name": "office"
+      "mac": "d4:3d:7e:34:af:f3",
+      "vlan": "123.321"
+    },
+    "office2": {
+      "ip": "192.168.0.23/24",
+      "gateway": "109.207.200.209",
+      "vlan": "17"
     }
   }
 }

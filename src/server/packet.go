@@ -1,25 +1,25 @@
 package server
 
 import (
-	"github.com/google/gopacket/layers"
 	"config"
+	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 )
 
 type DP struct {
-	SrcMac     net.HardwareAddr
-	DstMac     net.HardwareAddr
-	EtherType  layers.EthernetType
-	VLan       []uint16
-	SrcIP      net.IP
-	DstIP      net.IP
-	SrcPort    layers.UDPPort
-	DstPort    layers.UDPPort
-	app        []byte
-	OpCode     byte
-	Dhcp       struct {
+	SrcMac    net.HardwareAddr
+	DstMac    net.HardwareAddr
+	EtherType layers.EthernetType
+	VLan      []uint16
+	SrcIP     net.IP
+	DstIP     net.IP
+	SrcPort   layers.UDPPort
+	DstPort   layers.UDPPort
+	app       []byte
+	OpCode    byte
+	Dhcp      struct {
 		packet      dhcp4.Packet
 		MsgType     dhcp4.MessageType  // 0x53
 		Options     dhcp4.Options      //
@@ -29,7 +29,7 @@ type DP struct {
 	}
 }
 
-func (dp *DP) getOptions(p dhcp4.Packet, lease config.Lease, server *DhcpServer) dhcp4.Options {
+func (dp *DP) getOptions(p dhcp4.Packet, lease *config.Lease, server *DhcpServer) dhcp4.Options {
 	options := dhcp4.Options{
 		dhcp4.OptionSubnetMask:       []byte(lease.Mask),
 		dhcp4.OptionRouter:           []byte(lease.Gateway),
@@ -60,7 +60,7 @@ func (dp *DP) getOptions(p dhcp4.Packet, lease config.Lease, server *DhcpServer)
 	return options
 }
 
-func (dp *DP) OfferResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packet {
+func (dp *DP) OfferResponse(lease *config.Lease, server *DhcpServer) *dhcp4.Packet {
 	options := dp.getOptions(dp.Dhcp.packet, lease, server)
 	p := dhcp4.ReplyPacket(
 		dp.Dhcp.packet,                                                              // request packet
@@ -74,7 +74,7 @@ func (dp *DP) OfferResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packe
 	return &p
 }
 
-func (dp *DP) NakResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packet {
+func (dp *DP) NakResponse(lease *config.Lease, server *DhcpServer) *dhcp4.Packet {
 	p := dhcp4.ReplyPacket(
 		dp.Dhcp.packet,          // request packet
 		dhcp4.NAK,               // message type
@@ -86,7 +86,7 @@ func (dp *DP) NakResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packet 
 	return &p
 }
 
-func (dp *DP) AckResponse(lease config.Lease, server *DhcpServer) *dhcp4.Packet {
+func (dp *DP) AckResponse(lease *config.Lease, server *DhcpServer) *dhcp4.Packet {
 	options := dp.getOptions(dp.Dhcp.packet, lease, server)
 	p := dhcp4.ReplyPacket(
 		dp.Dhcp.packet,                                                              // request packet

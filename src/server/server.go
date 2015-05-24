@@ -84,11 +84,11 @@ func (s *DhcpServer) respond(p *DP) {
 	}
 	if response != nil {
 		log.Printf(
-			"%s to %s (vlan %s)",
+			"%s to %s (vlan %s): %s",
 			response.DhcpType,
 			p.SrcMac,
 			s.vlanList(p),
-			response.DhcpType,
+			response.DstIp,
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])
@@ -106,7 +106,7 @@ func (s *DhcpServer) respond(p *DP) {
 }
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
-	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
+	if lease := s.getLease(p); lease != nil {
 		if p.Dhcp.packet.CIAddr() == nil {
 			return s.prepareOffer(p, lease)
 		} else if lease.Ip.Equal(p.Dhcp.packet.CIAddr()) {
@@ -120,14 +120,30 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	return nil
 }
 
-func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
+func (s *DhcpServer) getLease(p *DP) *config.Lease {
 	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-		return s.prepareOffer(p, lease)
+		return &lease
+	}
+	v := config.VLanMac{}
+	v.Set(p.VLan, p.SrcMac)
+	if lease, ok := s.config.VLans[v]; ok {
+		return &lease
+	}
+	v.Set(p.VLan, nil)
+	if lease, ok := s.config.VLans[v]; ok {
+		return &lease
 	}
 	return nil
 }
 
-func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
+	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
+		return s.prepareOffer(p, &lease)
+	}
+	return nil
+}
+
+func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.OfferResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.Offer,
@@ -142,7 +158,7 @@ func (s *DhcpServer) prepareOffer(p *DP, lease config.Lease) *raw_packet.RawPack
 	return responsePacket
 }
 
-func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.AckResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.ACK,
@@ -157,7 +173,7 @@ func (s *DhcpServer) prepareAck(p *DP, lease config.Lease) *raw_packet.RawPacket
 	return responsePacket
 }
 
-func (s *DhcpServer) prepareNak(p *DP, lease config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.NakResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.NAK,

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,9 +20,10 @@ type rawServerConfig struct {
 }
 
 type rawLease struct {
-	Ip       string `json:"ip"`
-	Gateway  string `json:"gateway"`
-	HostName string `json:"host name"`
+	Ip      string `json:"ip"`
+	Gateway string `json:"gateway"`
+	Mac     string `json:"mac"`
+	VLan    string `json:"vlan"`
 }
 
 type ServerConfig struct {
@@ -32,6 +34,7 @@ type ServerConfig struct {
 	NameServers []byte
 	TimeOffset  uint16
 	Leases      map[string]Lease
+	VLans       map[VLanMac]Lease
 }
 
 type Lease struct {
@@ -40,6 +43,8 @@ type Lease struct {
 	Broadcast net.IP
 	Gateway   net.IP
 	HostName  string
+	Mac       net.HardwareAddr
+	VLan      VLanMac
 }
 
 func Read(fileName string) (*ServerConfig, error) {
@@ -59,6 +64,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 	conf := &ServerConfig{
 		Listen:     c.Listen,
 		Leases:     make(map[string]Lease),
+		VLans:      make(map[VLanMac]Lease),
 		LeaseTime:  time.Duration(c.LeaseTime) * time.Second,
 		MyAddress:  net.ParseIP(c.MyAddress).To4(),
 		TimeOffset: c.TimeOffset,
@@ -70,13 +76,12 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 			log.Fatalf("Invalid nameserver adddress: %s", nsIp)
 		}
 	}
-	for mac, lease := range c.Leases {
-		if len(lease.HostName) > 11 {
-			log.Fatalf("Host name is too long (max 11 bytes): %s", lease.HostName)
+	for hostName, lease := range c.Leases {
+		if len(hostName) > 11 {
+			log.Fatalf("Host name is too long (max 11 bytes): %s", hostName)
 		}
-		_, err := net.ParseMAC(mac)
-		if err != nil {
-			log.Fatal(err)
+		if lease.VLan == "" && lease.Mac == "" {
+			log.Fatalf("Cannot have both mac and vlan empty for host %s", hostName)
 		}
 		ip, ipn, err := net.ParseCIDR(lease.Ip)
 		if err != nil {
@@ -84,12 +89,57 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		}
 		ip = ip.To4()
 		broadcast := net.IPv4(ip[0]|(^ipn.Mask[0]), ip[1]|(^ipn.Mask[1]), ip[2]|(^ipn.Mask[2]), ip[3]|(^ipn.Mask[3])).To4()
-		conf.Leases[strings.ToLower(mac)] = Lease{
-			Ip:        ip.To4(),
-			Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
-			Gateway:   net.ParseIP(lease.Gateway).To4(),
-			Broadcast: broadcast,
-			HostName:  lease.HostName,
+		vl := VLanMac{}
+		mac := net.HardwareAddr{}
+		if lease.Mac != "" {
+			mac, err = net.ParseMAC(lease.Mac)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+		vl.Mac = mac.String()
+		if lease.VLan != "" {
+			if strings.Contains(lease.VLan, ".") {
+				vlans := strings.Split(lease.VLan, ".")
+				if len(vlans) != 2 {
+					log.Fatalf("Cannot parse vlan %s", lease.VLan)
+				}
+				l1, err := strconv.Atoi(vlans[0])
+				if err != nil {
+					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
+				}
+				vl.L1 = uint16(l1)
+				l2, err := strconv.Atoi(vlans[1])
+				if err != nil {
+					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
+				}
+				vl.L2 = uint16(l2)
+			} else {
+				l1, err := strconv.Atoi(lease.VLan)
+				if err != nil {
+					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
+				}
+				vl.L1 = uint16(l1)
+			}
+			conf.VLans[vl] = Lease{
+				Ip:        ip.To4(),
+				Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
+				Gateway:   net.ParseIP(lease.Gateway).To4(),
+				Broadcast: broadcast,
+				HostName:  hostName,
+				Mac:       mac,
+				VLan:      vl,
+			}
+		} else {
+			conf.Leases[mac.String()] = Lease{
+				Ip:        ip.To4(),
+				Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
+				Gateway:   net.ParseIP(lease.Gateway).To4(),
+				Broadcast: broadcast,
+				HostName:  hostName,
+				Mac:       mac,
+				VLan:      vl,
+			}
 		}
 	}
 	return conf, nil
