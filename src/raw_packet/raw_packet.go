@@ -1,9 +1,9 @@
 package raw_packet
 
 import (
-	"github.com/krolaw/dhcp4"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 )
@@ -14,6 +14,7 @@ type RawPacket struct {
 	DstMac    net.HardwareAddr
 	SrcIp     net.IP
 	DstIp     net.IP
+	OfferedIp net.IP
 	VLan      []uint16
 	EtherType layers.EthernetType
 	Payload   []byte

@@ -88,7 +88,7 @@ func (s *DhcpServer) respond(p *DP) {
 			response.DhcpType,
 			p.SrcMac,
 			s.vlanList(p),
-			response.DstIp,
+			response.OfferedIp,
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])
@@ -152,6 +152,7 @@ func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPac
 		Payload:   []byte(*resp),
 		SrcIp:     s.config.MyAddress,
 		DstIp:     p.SrcIP,
+		OfferedIp: lease.Ip,
 		DstMac:    p.SrcMac,
 		SrcMac:    s.config.MyMac,
 	}
@@ -167,6 +168,7 @@ func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacke
 		Payload:   []byte(*resp),
 		SrcIp:     s.config.MyAddress,
 		DstIp:     p.Dhcp.packet.CIAddr(),
+		OfferedIp: lease.Ip,
 		DstMac:    p.SrcMac,
 		SrcMac:    s.config.MyMac,
 	}
@@ -182,6 +184,7 @@ func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacke
 		Payload:   []byte(*resp),
 		SrcIp:     s.config.MyAddress,
 		DstIp:     p.SrcIP,
+		OfferedIp: lease.Ip,
 		DstMac:    p.SrcMac,
 		SrcMac:    s.config.MyMac,
 	}

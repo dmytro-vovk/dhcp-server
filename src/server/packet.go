@@ -4,7 +4,6 @@ import (
 	"config"
 	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
-	"log"
 	"net"
 )
 
@@ -54,7 +53,7 @@ func (dp *DP) getOptions(p dhcp4.Packet, lease *config.Lease, server *DhcpServer
 		case dhcp4.OptionHostName:
 		case dhcp4.OptionStaticRoute:
 		default:
-			log.Printf("Option %d (%x) not implemented", opt, opt)
+			//log.Printf("Option %d (%x) not implemented", opt, opt)
 		}
 	}
 	return options
