@@ -1,11 +1,12 @@
 package raw_packet
 
 import (
+	"log"
+	"net"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
-	"log"
-	"net"
 )
 
 type RawPacket struct {

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func (s *DhcpServer) vlanList(p *DP) string {
+func (s *DhcpServer) vlanList(p *DataPacket) string {
 	if len(p.VLan) > 0 {
 		list := []string{}
 		for _, v := range p.VLan {

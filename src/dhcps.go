@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"server"
+	"tcp_resolver"
 )
 
 var conf *config.ServerConfig
@@ -23,5 +24,19 @@ func init() {
 
 func main() {
 	log.Printf("Listening for DHCP requests on %s", conf.Listen)
-	server.New(conf).Run()
+	var resolver server.Resolver
+	if conf.ResolverAddr != "" {
+		log.Printf("Using tcp resolver at %q", conf.ResolverAddr)
+		var err error
+		if resolver, err = tcp_resolver.New(conf.ResolverAddr); err != nil {
+			log.Fatalf("Error creating resolver: %s", err)
+		}
+	} else {
+		log.Print("Using default resolver")
+		resolver = server.NewDefaultResolver(conf)
+	}
+	server.
+		New(conf).
+		SetResolver(resolver).
+		Run()
 }

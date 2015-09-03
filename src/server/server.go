@@ -5,14 +5,15 @@ import (
 	"config"
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 	"raw_packet"
 	"syscall"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/krolaw/dhcp4"
 )
 
 type DhcpServer struct {
@@ -22,6 +23,11 @@ type DhcpServer struct {
 	packetSource *gopacket.PacketSource
 	ifIndex      int
 	addr         syscall.SockaddrLinklayer
+	resolver     Resolver
+}
+
+type Resolver interface {
+	Resolve(*DataPacket) *config.Lease
 }
 
 func New(config *config.ServerConfig) *DhcpServer {
@@ -33,7 +39,15 @@ func New(config *config.ServerConfig) *DhcpServer {
 	return &server
 }
 
+func (s *DhcpServer) SetResolver(resolver Resolver) *DhcpServer {
+	s.resolver = resolver
+	return s
+}
+
 func (s *DhcpServer) Run() {
+	if s.resolver == nil {
+		log.Fatal("Resolver not set")
+	}
 	var err error
 	if s.handle, err = pcap.OpenLive(s.config.Listen, 1600, true, 0); err != nil {
 		log.Fatalf("Error opening live interface: %s", err)
@@ -73,7 +87,7 @@ func (s *DhcpServer) run() {
 	}
 }
 
-func (s *DhcpServer) respond(p *DP) {
+func (s *DhcpServer) respond(p *DataPacket) {
 	var response *raw_packet.RawPacket
 	switch p.Dhcp.MsgType {
 	case dhcp4.Request:
@@ -106,8 +120,8 @@ func (s *DhcpServer) respond(p *DP) {
 	}
 }
 
-func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
-	if lease := s.getLease(p); lease != nil {
+func (s *DhcpServer) processRequest(p *DataPacket) *raw_packet.RawPacket {
+	if lease := s.resolver.Resolve(p); lease != nil {
 		if p.Dhcp.packet.CIAddr() == nil {
 			return s.prepareOffer(p, lease)
 		} else if lease.Ip.Equal(p.Dhcp.packet.CIAddr()) {
@@ -121,30 +135,14 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	return nil
 }
 
-func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
-	if lease := s.getLease(p); lease != nil {
+func (s *DhcpServer) processDiscover(p *DataPacket) *raw_packet.RawPacket {
+	if lease := s.resolver.Resolve(p); lease != nil {
 		return s.prepareOffer(p, lease)
 	}
 	return nil
 }
 
-func (s *DhcpServer) getLease(p *DP) *config.Lease {
-	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
-		return &lease
-	}
-	v := config.VLanMac{}
-	v.Set(p.VLan, p.SrcMac)
-	if lease, ok := s.config.VLans[v]; ok {
-		return &lease
-	}
-	v.Set(p.VLan, nil)
-	if lease, ok := s.config.VLans[v]; ok {
-		return &lease
-	}
-	return nil
-}
-
-func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareOffer(p *DataPacket, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.OfferResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.Offer,
@@ -160,7 +158,7 @@ func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPac
 	return responsePacket
 }
 
-func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareAck(p *DataPacket, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.AckResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.ACK,
@@ -176,7 +174,7 @@ func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacke
 	return responsePacket
 }
 
-func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacket {
+func (s *DhcpServer) prepareNak(p *DataPacket, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.NakResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
 		DhcpType:  dhcp4.NAK,
@@ -192,8 +190,8 @@ func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacke
 	return responsePacket
 }
 
-func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
-	dp := &DP{}
+func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DataPacket, error) {
+	dp := &DataPacket{}
 	ethernet := p.LinkLayer().(*layers.Ethernet)
 	dp.SrcMac = ethernet.SrcMAC
 	dp.DstMac = ethernet.DstMAC
