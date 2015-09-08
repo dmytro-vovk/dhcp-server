@@ -37,7 +37,7 @@ func New(resolver resolverDef) (*Resolver, error) {
 
 func (r *Resolver) Resolve(p *server.DataPacket) *config.Lease {
 	r.Lock()
-	if r.connections.Len() == 0 {
+	if r.connections.Len() == 0 { // depleted, add new
 		r.connections.Push(r.connect())
 	}
 	conn := r.connections.Pop().(*conn)
@@ -47,7 +47,7 @@ func (r *Resolver) Resolve(p *server.DataPacket) *config.Lease {
 		// TODO
 	}
 	conn.Used = time.Now()
-	if r.connections.Len() < int(r.maxConns) {
+	if r.connections.Len() < int(r.maxConns) { // if limit exceeded, throw it away
 		r.connections.Push(conn)
 	}
 	return nil
