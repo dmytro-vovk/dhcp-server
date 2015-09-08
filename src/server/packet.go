@@ -4,6 +4,7 @@ import (
 	"config"
 	"net"
 
+	"encoding/json"
 	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
 )
@@ -99,4 +100,25 @@ func (dp *DataPacket) AckResponse(lease *config.Lease, server *DhcpServer) *dhcp
 	p.SetYIAddr(lease.Ip)
 	p.SetCIAddr(lease.Ip)
 	return &p
+}
+
+func (dp *DataPacket) Marshal() []byte {
+	type packed struct {
+		Mac   string `json:"mac"`
+		IP    string `json:"ip"`
+		VLan1 uint16 `json:"vlan1"`
+		VLan2 uint16 `json:"vlan2"`
+	}
+	p := packed{
+		Mac: dp.SrcMac.String(),
+		IP:  dp.SrcIP.String(),
+	}
+	if len(dp.VLan) == 2 {
+		p.VLan1 = dp.VLan[0]
+		p.VLan2 = dp.VLan[1]
+	} else if len(dp.VLan) == 1 {
+		p.VLan1 = dp.VLan[0]
+	}
+	encoded, _ := json.Marshal(p)
+	return encoded
 }

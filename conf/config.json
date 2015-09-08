@@ -2,7 +2,10 @@
   "listen on": "eth0",
   "my address": "109.207.200.209",
   "default lease time": 600,
-  "resolver": "127.0.0.1:10067",
+  "resolver": {
+    "address": "127.0.0.1:10067",
+    "max-conns": 10
+  },
   "name servers": [
     "109.207.200.209",
     "8.8.8.8"

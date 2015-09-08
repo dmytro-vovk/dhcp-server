@@ -25,10 +25,10 @@ func init() {
 func main() {
 	log.Printf("Listening for DHCP requests on %s", conf.Listen)
 	var resolver server.Resolver
-	if conf.ResolverAddr != "" {
-		log.Printf("Using tcp resolver at %q", conf.ResolverAddr)
+	if conf.Resolver.Address != "" {
+		log.Printf("Using tcp resolver at %q (max conns %d)", conf.Resolver.Address, conf.Resolver.Limit)
 		var err error
-		if resolver, err = tcp_resolver.New(conf.ResolverAddr); err != nil {
+		if resolver, err = tcp_resolver.New(conf.Resolver); err != nil {
 			log.Fatalf("Error creating resolver: %s", err)
 		}
 	} else {
