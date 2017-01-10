@@ -201,7 +201,7 @@ func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 	for _, l := range p.Layers() {
 		if l.LayerType() == layers.LayerTypeDot1Q {
 			dp.VLan = append(dp.VLan, uint16(l.LayerContents()[0])<<8+uint16(l.LayerContents()[1]))
-			if len(dp.VLan) == 2 {
+			if len(dp.VLan) > 1 {
 				// cut to 12 lower bit
 				dp.VLan[1] = dp.VLan[1] - dp.VLan[1]>>12<<12
 			}

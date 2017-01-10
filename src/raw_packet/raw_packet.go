@@ -1,11 +1,12 @@
 package raw_packet
 
 import (
+	"log"
+	"net"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
-	"log"
-	"net"
 )
 
 type RawPacket struct {
@@ -54,18 +55,18 @@ func (rp *RawPacket) Marshal() []byte {
 func (rp *RawPacket) buildDot1QHeader() []layers.Dot1Q {
 	if len(rp.VLan) == 2 {
 		return []layers.Dot1Q{
-			layers.Dot1Q{
+			{
 				VLANIdentifier: rp.VLan[0],
 				Type:           layers.EthernetTypeDot1Q,
 			},
-			layers.Dot1Q{
+			{
 				VLANIdentifier: rp.VLan[1],
 				Type:           layers.EthernetTypeIPv4,
 			},
 		}
 	} else if len(rp.VLan) == 1 {
 		return []layers.Dot1Q{
-			layers.Dot1Q{
+			{
 				VLANIdentifier: rp.VLan[0],
 				Type:           layers.EthernetTypeIPv4,
 			},

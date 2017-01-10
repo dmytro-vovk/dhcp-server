@@ -2,9 +2,10 @@ package server
 
 import (
 	"config"
+	"net"
+
 	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
-	"net"
 )
 
 type DP struct {
