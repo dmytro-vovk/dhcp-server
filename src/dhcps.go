@@ -1,5 +1,6 @@
 package main
 
+// Compile for i386: GOARCH=386 CGO_ENABLED=1 go build src/dhcps.go
 import (
 	"config"
 	"flag"
