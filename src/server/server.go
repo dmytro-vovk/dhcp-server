@@ -6,14 +6,15 @@ import (
 	"config"
 	"errors"
 	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
-	"github.com/krolaw/dhcp4"
 	"log"
 	"net"
 	"raw_packet"
 	"syscall"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/krolaw/dhcp4"
 )
 
 type DhcpServer struct {
