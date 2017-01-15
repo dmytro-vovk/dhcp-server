@@ -34,7 +34,7 @@ type ServerConfig struct {
 	NameServers []byte
 	TimeOffset  uint16
 	Leases      map[string]Lease
-	VLans       map[VLanMac]Lease
+	VLans       map[string]Lease
 }
 
 type Lease struct {
@@ -64,7 +64,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 	conf := &ServerConfig{
 		Listen:     c.Listen,
 		Leases:     make(map[string]Lease),
-		VLans:      make(map[VLanMac]Lease),
+		VLans:      make(map[string]Lease),
 		LeaseTime:  time.Duration(c.LeaseTime) * time.Second,
 		MyAddress:  net.ParseIP(c.MyAddress).To4(),
 		TimeOffset: c.TimeOffset,
@@ -100,28 +100,21 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		vl.Mac = mac.String()
 		if lease.VLan != "" {
 			if strings.Contains(lease.VLan, ".") {
-				vlans := strings.Split(lease.VLan, ".")
-				if len(vlans) != 2 {
-					log.Fatalf("Cannot parse vlan %s", lease.VLan)
+				for _, l := range strings.Split(lease.VLan, ".") {
+					id, err := strconv.Atoi(l)
+					if err != nil {
+						log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
+					}
+					vl.L = append(vl.L, uint16(id))
 				}
-				l1, err := strconv.Atoi(vlans[0])
-				if err != nil {
-					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
-				}
-				vl.L1 = uint16(l1)
-				l2, err := strconv.Atoi(vlans[1])
-				if err != nil {
-					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
-				}
-				vl.L2 = uint16(l2)
 			} else {
-				l1, err := strconv.Atoi(lease.VLan)
+				l, err := strconv.Atoi(lease.VLan)
 				if err != nil {
 					log.Fatalf("Cannot parse vlan %s: %s", lease.VLan, err)
 				}
-				vl.L1 = uint16(l1)
+				vl.L = []uint16{uint16(l)}
 			}
-			conf.VLans[vl] = Lease{
+			conf.VLans[mac.String()] = Lease{
 				Ip:        ip.To4(),
 				Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
 				Gateway:   net.ParseIP(lease.Gateway).To4(),

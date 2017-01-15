@@ -13,6 +13,7 @@ var conf *config.ServerConfig
 func init() {
 	configFile := flag.String("config", "/etc/deep-dhcp/config.json", "Path to config file")
 	flag.Parse()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Print("Starting Deep DHCP Server...")
 	var err error
 	conf, err = config.Read(*configFile)

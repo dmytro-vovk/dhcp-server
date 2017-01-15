@@ -6,19 +6,18 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/krolaw/dhcp4"
 )
 
 type RawPacket struct {
-	DhcpType  dhcp4.MessageType
+	DhcpType  layers.DHCPMsgType
 	SrcMac    net.HardwareAddr
 	DstMac    net.HardwareAddr
 	SrcIp     net.IP
 	DstIp     net.IP
 	OfferedIp net.IP
-	VLan      []uint16
+	VLan      []*layers.Dot1Q
 	EtherType layers.EthernetType
-	Payload   []byte
+	Payload   *layers.DHCPv4
 }
 
 func (rp *RawPacket) Marshal() []byte {
@@ -33,14 +32,14 @@ func (rp *RawPacket) Marshal() []byte {
 	udp.SetNetworkLayerForChecksum(&ip)
 	var err error
 	if rp.EtherType == layers.EthernetTypeIPv4 {
-		err = gopacket.SerializeLayers(buf, opts, &ether, &ip, &udp, gopacket.Payload(rp.Payload))
+		err = gopacket.SerializeLayers(buf, opts, &ether, &ip, &udp, rp.Payload)
 	} else if rp.EtherType == layers.EthernetTypeDot1Q {
 		lss := []gopacket.SerializableLayer{&ether}
 		dot1layers := rp.buildDot1QHeader()
 		for k := range dot1layers {
-			lss = append(lss, &dot1layers[k])
+			lss = append(lss, dot1layers[k])
 		}
-		lss = append(lss, &ip, &udp, gopacket.Payload(rp.Payload))
+		lss = append(lss, &ip, &udp, rp.Payload)
 		err = gopacket.SerializeLayers(buf, opts, lss...)
 	} else {
 		log.Printf("Unsupported ethernet type %x", rp.EtherType)
@@ -52,28 +51,8 @@ func (rp *RawPacket) Marshal() []byte {
 	return buf.Bytes()
 }
 
-func (rp *RawPacket) buildDot1QHeader() []layers.Dot1Q {
-	if len(rp.VLan) == 2 {
-		return []layers.Dot1Q{
-			{
-				VLANIdentifier: rp.VLan[0],
-				Type:           layers.EthernetTypeDot1Q,
-			},
-			{
-				VLANIdentifier: rp.VLan[1],
-				Type:           layers.EthernetTypeIPv4,
-			},
-		}
-	} else if len(rp.VLan) == 1 {
-		return []layers.Dot1Q{
-			{
-				VLANIdentifier: rp.VLan[0],
-				Type:           layers.EthernetTypeIPv4,
-			},
-		}
-	} else {
-		return []layers.Dot1Q{}
-	}
+func (rp *RawPacket) buildDot1QHeader() []*layers.Dot1Q {
+	return rp.VLan
 }
 
 func (rp *RawPacket) buildEtherHeader(etherType layers.EthernetType) layers.Ethernet {
@@ -99,7 +78,7 @@ func (rp *RawPacket) buildUDPHeader() layers.UDP {
 	return layers.UDP{
 		SrcPort:  67,
 		DstPort:  68,
-		Length:   uint16(len(rp.Payload)),
+		Length:   rp.Payload.Len(),
 		Checksum: 0,
 	}
 }

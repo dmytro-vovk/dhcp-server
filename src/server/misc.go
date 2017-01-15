@@ -10,7 +10,7 @@ func (s *DhcpServer) vlanList(p *DP) string {
 	if len(p.VLan) > 0 {
 		list := []string{}
 		for _, v := range p.VLan {
-			list = append(list, fmt.Sprintf("%d", v))
+			list = append(list, fmt.Sprintf("%d", v.VLANIdentifier))
 		}
 		return strings.Join(list, ".")
 	} else {

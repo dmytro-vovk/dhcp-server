@@ -1,18 +1,19 @@
 package config
 
 import (
-	"fmt"
-	"log"
 	"net"
+	"strconv"
+	"strings"
+
+	"github.com/google/gopacket/layers"
 )
 
 type VLanMac struct {
-	L1  uint16
-	L2  uint16
+	L   []uint16
 	Mac string
 }
 
-func (v *VLanMac) Set(vlans []uint16, mac net.HardwareAddr) *VLanMac {
+func (v *VLanMac) Set(vlans []*layers.Dot1Q, mac net.HardwareAddr) *VLanMac {
 	if v == nil {
 		v = &VLanMac{}
 	}
@@ -21,27 +22,16 @@ func (v *VLanMac) Set(vlans []uint16, mac net.HardwareAddr) *VLanMac {
 	} else {
 		v.Mac = mac.String()
 	}
-	if len(vlans) == 2 {
-		v.L1 = vlans[0]
-		v.L2 = vlans[1]
-	} else if len(vlans) == 1 {
-		v.L1 = vlans[0]
-		v.L2 = 0
-	} else if len(vlans) == 0 {
-		v.L1 = 0
-		v.L2 = 0
-	} else {
-		log.Printf("Cold not set VLan, got wrong number of values: %d", len(vlans))
+	for _, vl := range vlans {
+		v.L = append(v.L, vl.VLANIdentifier)
 	}
 	return v
 }
 
 func (v VLanMac) String() string {
-	if v.L1 == 0 {
-		return ""
+	vv := []string{}
+	for _, vl := range v.L {
+		vv = append(vv, strconv.Itoa(int(vl)))
 	}
-	if v.L2 == 0 {
-		return fmt.Sprintf("%d", v.L1)
-	}
-	return fmt.Sprintf("%d.%d", v.L1, v.L2)
+	return strings.Join(vv, ".")
 }

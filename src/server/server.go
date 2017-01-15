@@ -4,7 +4,6 @@ package server
 
 import (
 	"config"
-	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -14,7 +13,6 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/krolaw/dhcp4"
 )
 
 type DhcpServer struct {
@@ -64,26 +62,23 @@ func (s *DhcpServer) run() {
 			fmt.Printf("Error parsing incoming packet: %s", err)
 			continue
 		}
+		s.respond(p)
 		log.Printf(
-			"%s from mac %s, ip %s, host %s, vlan %s",
-			p.Dhcp.MsgType,
+			"%s from mac %s, ip %s, vlan %s",
+			p.DHCP.Operation,
 			p.SrcMac,
 			p.SrcIP,
-			p.Dhcp.HostName,
 			s.vlanList(p))
-		s.respond(p)
 	}
 }
 
 func (s *DhcpServer) respond(p *DP) {
 	var response *raw_packet.RawPacket
-	switch p.Dhcp.MsgType {
-	case dhcp4.Request:
+	switch p.DHCP.Operation {
+	case layers.DHCPOpRequest:
 		response = s.processRequest(p)
-	case dhcp4.Discover:
-		response = s.processDiscover(p)
 	default:
-		log.Printf("Request %s (%d) not yet implemented", p.Dhcp.MsgType, p.Dhcp.MsgType)
+		log.Printf("Request %q not yet implemented", p.DHCP.Operation)
 	}
 	if response != nil {
 		log.Printf(
@@ -109,23 +104,23 @@ func (s *DhcpServer) respond(p *DP) {
 }
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
+	log.Printf(
+		"OP: %s, HW: %s, ClientIP: %s, YouClientIP: %s",
+		p.DHCP.Operation,
+		p.DHCP.ClientHWAddr,
+		p.DHCP.ClientIP,
+		p.DHCP.YourClientIP,
+	)
 	if lease := s.getLease(p); lease != nil {
-		if p.Dhcp.packet.CIAddr() == nil {
+		log.Printf("Host is %s", lease.HostName)
+		switch {
+		case p.DHCP.ClientIP.Equal(net.IPv4zero):
 			return s.prepareOffer(p, lease)
-		} else if lease.Ip.Equal(p.Dhcp.packet.CIAddr()) {
-			return s.prepareAck(p, lease)
-		} else if lease.Ip.Equal(p.Dhcp.RequestedIp) {
+		case lease.Ip.Equal(p.DHCP.YourClientIP) || lease.Ip.Equal(p.DHCP.ClientIP):
 			return s.prepareAck(p, lease)
 		}
-		log.Printf("NAK: client wants %s, got %s", p.Dhcp.RequestedIp, lease.Ip)
+		log.Printf("NAK: client wants %s, got %s", p.DHCP.YourClientIP, lease.Ip)
 		return s.prepareNak(p, lease)
-	}
-	return nil
-}
-
-func (s *DhcpServer) processDiscover(p *DP) *raw_packet.RawPacket {
-	if lease := s.getLease(p); lease != nil {
-		return s.prepareOffer(p, lease)
 	}
 	return nil
 }
@@ -136,11 +131,11 @@ func (s *DhcpServer) getLease(p *DP) *config.Lease {
 	}
 	v := config.VLanMac{}
 	v.Set(p.VLan, p.SrcMac)
-	if lease, ok := s.config.VLans[v]; ok {
+	if lease, ok := s.config.VLans[p.SrcMac.String()]; ok {
 		return &lease
 	}
 	v.Set(p.VLan, nil)
-	if lease, ok := s.config.VLans[v]; ok {
+	if lease, ok := s.config.VLans[p.SrcMac.String()]; ok {
 		return &lease
 	}
 	return nil
@@ -149,10 +144,10 @@ func (s *DhcpServer) getLease(p *DP) *config.Lease {
 func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.OfferResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.Offer,
+		DhcpType:  layers.DHCPMsgTypeOffer,
 		EtherType: p.EtherType,
 		VLan:      p.VLan,
-		Payload:   []byte(*resp),
+		Payload:   resp,
 		SrcIp:     s.config.MyAddress,
 		DstIp:     p.SrcIP,
 		OfferedIp: lease.Ip,
@@ -165,12 +160,12 @@ func (s *DhcpServer) prepareOffer(p *DP, lease *config.Lease) *raw_packet.RawPac
 func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.AckResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.ACK,
+		DhcpType:  layers.DHCPMsgTypeAck,
 		EtherType: p.EtherType,
 		VLan:      p.VLan,
-		Payload:   []byte(*resp),
+		Payload:   resp,
 		SrcIp:     s.config.MyAddress,
-		DstIp:     p.Dhcp.packet.CIAddr(),
+		DstIp:     p.SrcIP,
 		OfferedIp: lease.Ip,
 		DstMac:    p.SrcMac,
 		SrcMac:    s.config.MyMac,
@@ -181,10 +176,10 @@ func (s *DhcpServer) prepareAck(p *DP, lease *config.Lease) *raw_packet.RawPacke
 func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacket {
 	resp := p.NakResponse(lease, s)
 	responsePacket := &raw_packet.RawPacket{
-		DhcpType:  dhcp4.NAK,
+		DhcpType:  layers.DHCPMsgTypeNak,
 		EtherType: p.EtherType,
 		VLan:      p.VLan,
-		Payload:   []byte(*resp),
+		Payload:   resp,
 		SrcIp:     s.config.MyAddress,
 		DstIp:     p.SrcIP,
 		OfferedIp: lease.Ip,
@@ -197,46 +192,21 @@ func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacke
 func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
 	dp := &DP{}
 	ethernet := p.LinkLayer().(*layers.Ethernet)
+	ip := p.NetworkLayer().(*layers.IPv4)
+	transport := p.TransportLayer().(*layers.UDP)
 	dp.SrcMac = ethernet.SrcMAC
 	dp.DstMac = ethernet.DstMAC
 	dp.EtherType = ethernet.EthernetType
-	for _, l := range p.Layers() {
-		if l.LayerType() == layers.LayerTypeDot1Q {
-			dp.VLan = append(dp.VLan, uint16(l.LayerContents()[0])<<8+uint16(l.LayerContents()[1]))
-			if len(dp.VLan) > 1 {
-				// cut to 12 lower bit
-				dp.VLan[1] = dp.VLan[1] - dp.VLan[1]>>12<<12
-			}
-		}
-	}
-	ip := p.NetworkLayer().(*layers.IPv4)
 	dp.SrcIP = ip.SrcIP
 	dp.DstIP = ip.DstIP
-	transport := p.TransportLayer().(*layers.UDP)
 	dp.SrcPort = transport.SrcPort
 	dp.DstPort = transport.DstPort
-	dp.app = p.ApplicationLayer().Payload()
-	dp.OpCode = dp.app[0]
-	dp.Dhcp.packet = dhcp4.Packet(dp.app)
-	dp.Dhcp.Options = dp.Dhcp.packet.ParseOptions()
-	if msgType, ok := dp.Dhcp.Options[dhcp4.OptionDHCPMessageType]; ok {
-		if len(msgType) != 1 {
-			return nil, errors.New("Cannot parse DHCP message type")
+	for _, l := range p.Layers() {
+		if l.LayerType() == layers.LayerTypeDot1Q {
+			dp.VLan = append(dp.VLan, l.(*layers.Dot1Q))
 		}
-		dp.Dhcp.MsgType = dhcp4.MessageType(msgType[0])
-	}
-	if hostName, ok := dp.Dhcp.Options[dhcp4.OptionHostName]; ok {
-		dp.Dhcp.HostName = string(hostName)
-	}
-	if requestList, ok := dp.Dhcp.Options[dhcp4.OptionParameterRequestList]; ok {
-		dp.Dhcp.RequestList = make([]dhcp4.OptionCode, len(requestList))
-		for i, code := range requestList {
-			dp.Dhcp.RequestList[i] = dhcp4.OptionCode(code)
-		}
-	}
-	if requestedIp, ok := dp.Dhcp.Options[dhcp4.OptionRequestedIPAddress]; ok {
-		if len(requestedIp) == 4 {
-			dp.Dhcp.RequestedIp = net.IPv4(requestedIp[0], requestedIp[1], requestedIp[2], requestedIp[3])
+		if l.LayerType() == layers.LayerTypeDHCPv4 {
+			dp.DHCP = l.(*layers.DHCPv4)
 		}
 	}
 	return dp, nil
