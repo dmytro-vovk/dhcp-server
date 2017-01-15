@@ -1,6 +1,6 @@
 {
   "listen on": "eth0",
-  "my address": "109.207.200.209",
+  "my address": "1.2.3.4",
   "default lease time": 600,
   "name servers": [
     "109.207.200.209",

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -27,14 +28,15 @@ type rawLease struct {
 }
 
 type ServerConfig struct {
-	Listen      string
-	MyAddress   net.IP
-	MyMac       net.HardwareAddr
-	LeaseTime   time.Duration
-	NameServers []byte
-	TimeOffset  uint16
-	Leases      map[string]Lease
-	VLans       map[string]Lease
+	Listen         string
+	MyAddress      net.IP
+	MyMac          net.HardwareAddr
+	LeaseTime      time.Duration
+	LeaseTimeBytes []byte
+	NameServers    []byte
+	TimeOffset     uint16
+	Leases         map[string]Lease
+	VLans          map[string]Lease
 }
 
 type Lease struct {
@@ -62,13 +64,15 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		return nil, err
 	}
 	conf := &ServerConfig{
-		Listen:     c.Listen,
-		Leases:     make(map[string]Lease),
-		VLans:      make(map[string]Lease),
-		LeaseTime:  time.Duration(c.LeaseTime) * time.Second,
-		MyAddress:  net.ParseIP(c.MyAddress).To4(),
-		TimeOffset: c.TimeOffset,
+		Listen:         c.Listen,
+		Leases:         make(map[string]Lease),
+		VLans:          make(map[string]Lease),
+		LeaseTime:      time.Duration(c.LeaseTime) * time.Second,
+		LeaseTimeBytes: make([]byte, 4),
+		MyAddress:      net.ParseIP(c.MyAddress).To4(),
+		TimeOffset:     c.TimeOffset,
 	}
+	binary.BigEndian.PutUint32(conf.LeaseTimeBytes, uint32(conf.LeaseTime/time.Second))
 	for _, ns := range c.NameServers {
 		if nsIp := net.ParseIP(ns); nsIp != nil {
 			conf.NameServers = append(conf.NameServers, nsIp.To4()...)

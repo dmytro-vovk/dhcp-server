@@ -2,6 +2,7 @@ package server
 
 import (
 	"config"
+	"log"
 	"net"
 
 	"github.com/google/gopacket/layers"
@@ -20,84 +21,58 @@ type DP struct {
 	DHCP      *layers.DHCPv4
 }
 
-/*
-func (dp *DP) getOptions(p dhcp4.Packet, lease *config.Lease, server *DhcpServer) dhcp4.Options {
-	options := dhcp4.Options{
-		dhcp4.OptionSubnetMask:       []byte(lease.Mask),
-		dhcp4.OptionRouter:           []byte(lease.Gateway),
-		dhcp4.OptionDomainNameServer: []byte(server.config.NameServers),
+func (dp *DP) getOptions(lease *config.Lease, server *DhcpServer) layers.DHCPOptions {
+	options := layers.DHCPOptions{
+		layers.NewDHCPOption(layers.DHCPOptSubnetMask, []byte(lease.Mask)),
+		layers.NewDHCPOption(layers.DHCPOptRouter, []byte(lease.Gateway)),
+		layers.NewDHCPOption(layers.DHCPOptDNS, server.config.NameServers),
+		layers.NewDHCPOption(layers.DHCPOptBroadcastAddr, []byte(lease.Broadcast)),
+		layers.NewDHCPOption(layers.DHCPOptLeaseTime, server.config.LeaseTimeBytes),
+		layers.NewDHCPOption(layers.DHCPOptDomainName, []byte(lease.HostName)),
 	}
-	for _, opt := range dp.Dhcp.Options[dhcp4.OptionParameterRequestList] {
-		optionCode := dhcp4.OptionCode(opt)
-		switch optionCode {
-		case dhcp4.OptionSubnetMask:
-		case dhcp4.OptionRouter:
-		case dhcp4.OptionDomainNameServer:
-		case dhcp4.OptionDomainName:
-			options[optionCode] = []byte(lease.HostName)
-		case dhcp4.OptionBroadcastAddress:
-			options[optionCode] = []byte(lease.Broadcast)
-		case dhcp4.OptionInterfaceMTU:
-		case dhcp4.OptionTimeOffset:
-		case dhcp4.OptionNetBIOSOverTCPIPNameServer:
-		case dhcp4.OptionNetBIOSOverTCPIPScope:
-		case dhcp4.OptionNetworkTimeProtocolServers:
-		case dhcp4.OptionClasslessRouteFormat:
-		case dhcp4.OptionHostName:
-		case dhcp4.OptionStaticRoute:
-		default:
-			//log.Printf("Option %d (%x) not implemented", opt, opt)
-		}
+	for _, opt := range dp.DHCP.Options {
+		log.Printf("Option %s (%d)", opt, opt.Type)
 	}
 	return options
 }
-*/
+
 func (dp *DP) OfferResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {
-	return &layers.DHCPv4{}
-	/*
-		options := dp.getOptions(dp.Dhcp.packet, lease, server)
-		p := dhcp4.ReplyPacket(
-			dp.Dhcp.packet,                                                              // request packet
-			dhcp4.Offer,                                                                 // message type
-			server.config.MyAddress,                                                     // server address
-			lease.Ip,                                                                    // client address
-			server.config.LeaseTime,                                                     // lease time
-			options.SelectOrderOrAll(dp.Dhcp.Options[dhcp4.OptionParameterRequestList]), // options
-		)
-		p.SetYIAddr(lease.Ip)
-		return &p
-	*/
+	resp := &layers.DHCPv4{
+		Operation:    layers.DHCPOp(layers.DHCPMsgTypeOffer),
+		HardwareType: dp.DHCP.HardwareType,
+		ClientHWAddr: dp.DHCP.ClientHWAddr,
+		Options:      dp.getOptions(lease, server),
+		ClientIP:     dp.DHCP.ClientIP,
+		YourClientIP: dp.DHCP.YourClientIP,
+	}
+	resp.Options = append(resp.Options, layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(layers.DHCPMsgTypeOffer)}))
+	return resp
 }
 
 func (dp *DP) NakResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {
-	return &layers.DHCPv4{}
-	/*
-		p := dhcp4.ReplyPacket(
-			dp.Dhcp.packet,          // request packet
-			dhcp4.NAK,               // message type
-			server.config.MyAddress, // server address
-			nil, // client address
-			0,   // lease time
-			nil, // options
-		)
-		return &p
-	*/
+	return &layers.DHCPv4{
+		Operation:    layers.DHCPOp(layers.DHCPMsgTypeOffer),
+		HardwareType: dp.DHCP.HardwareType,
+		ClientHWAddr: dp.DHCP.ClientHWAddr,
+		Options: layers.DHCPOptions{
+			layers.NewDHCPOption(layers.DHCPOptServerID, server.config.MyAddress),
+			layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(layers.DHCPMsgTypeNak)}),
+		},
+		ClientIP:     dp.DHCP.ClientIP,
+		YourClientIP: dp.DHCP.YourClientIP,
+	}
 }
 
 func (dp *DP) AckResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {
-	return &layers.DHCPv4{}
-	/*
-		options := dp.getOptions(dp.Dhcp.packet, lease, server)
-		p := dhcp4.ReplyPacket(
-			dp.Dhcp.packet,                                                              // request packet
-			dhcp4.ACK,                                                                   // message type
-			server.config.MyAddress,                                                     // server address
-			net.IP(dp.Dhcp.Options[dhcp4.OptionRequestedIPAddress]),                     // client address
-			server.config.LeaseTime,                                                     // lease time
-			options.SelectOrderOrAll(dp.Dhcp.Options[dhcp4.OptionParameterRequestList]), // options
-		)
-		p.SetYIAddr(lease.Ip)
-		p.SetCIAddr(lease.Ip)
-		return &p
-	*/
+	resp := &layers.DHCPv4{
+		Operation:    layers.DHCPOpReply,
+		Xid:          dp.DHCP.Xid,
+		HardwareType: dp.DHCP.HardwareType,
+		ClientHWAddr: dp.DHCP.ClientHWAddr,
+		ClientIP:     lease.Ip,
+		YourClientIP: dp.DHCP.YourClientIP,
+		Options:      dp.getOptions(lease, server),
+	}
+	resp.Options = append(resp.Options, layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(layers.DHCPMsgTypeAck)}))
+	return resp
 }

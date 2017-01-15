@@ -112,7 +112,6 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 		p.DHCP.YourClientIP,
 	)
 	if lease := s.getLease(p); lease != nil {
-		log.Printf("Host is %s", lease.HostName)
 		switch {
 		case p.DHCP.ClientIP.Equal(net.IPv4zero):
 			return s.prepareOffer(p, lease)
