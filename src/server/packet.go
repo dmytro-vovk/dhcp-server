@@ -1,14 +1,15 @@
 package server
 
 import (
-	"log"
 	"net"
+	"time"
 
 	"github.com/dmitry-vovk/dhcp-server/src/config"
 	"github.com/google/gopacket/layers"
 )
 
 type DP struct {
+	Created   time.Time
 	SrcMac    net.HardwareAddr
 	DstMac    net.HardwareAddr
 	EtherType layers.EthernetType
@@ -22,7 +23,7 @@ type DP struct {
 }
 
 func (dp *DP) getOptions(lease *config.Lease, server *DhcpServer) layers.DHCPOptions {
-	options := layers.DHCPOptions{
+	return layers.DHCPOptions{
 		layers.NewDHCPOption(layers.DHCPOptSubnetMask, []byte(lease.Mask)),
 		layers.NewDHCPOption(layers.DHCPOptRouter, []byte(lease.Gateway)),
 		layers.NewDHCPOption(layers.DHCPOptDNS, server.config.NameServers),
@@ -30,10 +31,6 @@ func (dp *DP) getOptions(lease *config.Lease, server *DhcpServer) layers.DHCPOpt
 		layers.NewDHCPOption(layers.DHCPOptLeaseTime, server.config.LeaseTimeBytes),
 		layers.NewDHCPOption(layers.DHCPOptDomainName, []byte(lease.HostName)),
 	}
-	for _, opt := range dp.DHCP.Options {
-		log.Printf("Option %s (%d)", opt, opt.Type)
-	}
-	return options
 }
 
 func (dp *DP) OfferResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {

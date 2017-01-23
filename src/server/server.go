@@ -13,6 +13,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"time"
 )
 
 type DhcpServer struct {
@@ -82,11 +83,12 @@ func (s *DhcpServer) respond(p *DP) {
 	}
 	if response != nil {
 		log.Printf(
-			"%s to %s (vlan %s): %s",
+			"%s to %s (vlan %s): %s (%d ms)",
 			response.DhcpType,
 			p.SrcMac,
 			s.vlanList(p),
 			response.OfferedIp,
+			time.Now().Sub(p.Created).Nanoseconds()/1000,
 		)
 		addr := s.addr
 		copy(addr.Addr[:], p.DstMac[0:8])
@@ -191,7 +193,9 @@ func (s *DhcpServer) prepareNak(p *DP, lease *config.Lease) *raw_packet.RawPacke
 }
 
 func (s *DhcpServer) parsePacket(p gopacket.Packet) (*DP, error) {
-	dp := &DP{}
+	dp := &DP{
+		Created: time.Now(),
+	}
 	ethernet := p.LinkLayer().(*layers.Ethernet)
 	ip := p.NetworkLayer().(*layers.IPv4)
 	transport := p.TransportLayer().(*layers.UDP)
