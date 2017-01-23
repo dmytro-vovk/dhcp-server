@@ -22,8 +22,9 @@ func (v *VLanMac) Set(vlans []*layers.Dot1Q, mac net.HardwareAddr) *VLanMac {
 	} else {
 		v.Mac = mac.String()
 	}
-	for _, vl := range vlans {
-		v.L = append(v.L, vl.VLANIdentifier)
+	v.L = make([]uint16, len(vlans), len(vlans))
+	for i, vl := range vlans {
+		v.L[i] = vl.VLANIdentifier
 	}
 	return v
 }
@@ -34,4 +35,8 @@ func (v VLanMac) String() string {
 		vv = append(vv, strconv.Itoa(int(vl)))
 	}
 	return strings.Join(vv, ".")
+}
+
+func (v VLanMac) Index() string {
+	return v.Mac + "|" + v.String()
 }

@@ -118,7 +118,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 				}
 				vl.L = []uint16{uint16(l)}
 			}
-			conf.VLans[mac.String()] = Lease{
+			conf.VLans[vl.Index()] = Lease{
 				Ip:        ip.To4(),
 				Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
 				Gateway:   net.ParseIP(lease.Gateway).To4(),
@@ -128,7 +128,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 				VLan:      vl,
 			}
 		} else {
-			conf.Leases[mac.String()] = Lease{
+			conf.Leases[vl.Index()] = Lease{
 				Ip:        ip.To4(),
 				Mask:      net.IPv4(ipn.Mask[0], ipn.Mask[1], ipn.Mask[2], ipn.Mask[3]).To4(),
 				Gateway:   net.ParseIP(lease.Gateway).To4(),

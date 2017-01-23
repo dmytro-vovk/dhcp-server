@@ -3,13 +3,13 @@
 package server
 
 import (
-	"config"
 	"fmt"
 	"log"
 	"net"
-	"raw_packet"
 	"syscall"
 
+	"github.com/dmitry-vovk/dhcp-server/src/config"
+	"github.com/dmitry-vovk/dhcp-server/src/raw_packet"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -125,16 +125,18 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 }
 
 func (s *DhcpServer) getLease(p *DP) *config.Lease {
-	if lease, ok := s.config.Leases[p.SrcMac.String()]; ok {
+	v := config.VLanMac{
+		Mac: p.SrcMac.String(),
+	}
+	if lease, ok := s.config.Leases[v.Index()]; ok {
 		return &lease
 	}
-	v := config.VLanMac{}
 	v.Set(p.VLan, p.SrcMac)
-	if lease, ok := s.config.VLans[p.SrcMac.String()]; ok {
+	if lease, ok := s.config.VLans[v.Index()]; ok {
 		return &lease
 	}
 	v.Set(p.VLan, nil)
-	if lease, ok := s.config.VLans[p.SrcMac.String()]; ok {
+	if lease, ok := s.config.VLans[v.Index()]; ok {
 		return &lease
 	}
 	return nil

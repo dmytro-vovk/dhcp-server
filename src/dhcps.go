@@ -2,10 +2,11 @@ package main
 
 // Compile for i386: GOARCH=386 CGO_ENABLED=1 go build src/dhcps.go
 import (
-	"config"
 	"flag"
 	"log"
-	"server"
+
+	"github.com/dmitry-vovk/dhcp-server/src/config"
+	"github.com/dmitry-vovk/dhcp-server/src/server"
 )
 
 var conf *config.ServerConfig

@@ -1,10 +1,10 @@
 package server
 
 import (
-	"config"
 	"log"
 	"net"
 
+	"github.com/dmitry-vovk/dhcp-server/src/config"
 	"github.com/google/gopacket/layers"
 )
 
