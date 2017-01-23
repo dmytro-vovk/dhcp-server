@@ -106,13 +106,6 @@ func (s *DhcpServer) respond(p *DP) {
 }
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
-	log.Printf(
-		"OP: %s, HW: %s, ClientIP: %s, YouClientIP: %s",
-		p.DHCP.Operation,
-		p.DHCP.ClientHWAddr,
-		p.DHCP.ClientIP,
-		p.DHCP.YourClientIP,
-	)
 	if lease := s.getLease(p); lease != nil {
 		switch {
 		case p.DHCP.ClientIP.Equal(net.IPv4zero):
