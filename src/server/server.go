@@ -69,7 +69,7 @@ func (s *DhcpServer) run() {
 			p.DHCP.Operation,
 			p.SrcMac,
 			p.SrcIP,
-			p.DHCP.ClientIP,
+			p.DHCP.YourClientIP,
 			s.vlanList(p))
 	}
 }
