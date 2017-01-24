@@ -65,10 +65,11 @@ func (s *DhcpServer) run() {
 		}
 		s.respond(p)
 		log.Printf(
-			"%s from mac %s, ip %s, vlan %s",
+			"%s from mac %s, ip %s (%s), vlan %s",
 			p.DHCP.Operation,
 			p.SrcMac,
 			p.SrcIP,
+			p.DHCP.ClientIP,
 			s.vlanList(p))
 	}
 }
