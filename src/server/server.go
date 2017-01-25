@@ -67,12 +67,21 @@ func (s *DhcpServer) run() {
 		s.respond(p)
 		log.Printf(
 			"%s from mac %s, ip %s (%s), vlan %s",
-			p.DHCP.Operation,
+			s.getRequestType(p),
 			p.SrcMac,
 			p.SrcIP,
 			p.DHCP.YourClientIP,
 			s.vlanList(p))
 	}
+}
+
+func (s *DhcpServer) getRequestType(p *DP) string {
+	for _, o := range p.DHCP.Options {
+		if o.Type == layers.DHCPOptMessageType && len(o.Data) > 0 {
+			return layers.DHCPMsgType(o.Data[0]).String()
+		}
+	}
+	return layers.DHCPMsgType(0).String()
 }
 
 func (s *DhcpServer) respond(p *DP) {
