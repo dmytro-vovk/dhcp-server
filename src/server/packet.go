@@ -30,17 +30,20 @@ func (dp *DP) getOptions(lease *config.Lease, server *DhcpServer) layers.DHCPOpt
 		layers.NewDHCPOption(layers.DHCPOptBroadcastAddr, []byte(lease.Broadcast)),
 		layers.NewDHCPOption(layers.DHCPOptLeaseTime, server.config.LeaseTimeBytes),
 		layers.NewDHCPOption(layers.DHCPOptDomainName, []byte(lease.HostName)),
+		layers.NewDHCPOption(layers.DHCPOptServerID, []byte(server.config.MyAddress)),
 	}
 }
 
 func (dp *DP) OfferResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {
 	resp := &layers.DHCPv4{
+		Xid:          dp.DHCP.Xid,
 		Operation:    layers.DHCPOp(layers.DHCPMsgTypeOffer),
 		HardwareType: dp.DHCP.HardwareType,
 		ClientHWAddr: dp.DHCP.ClientHWAddr,
 		Options:      dp.getOptions(lease, server),
 		ClientIP:     dp.DHCP.ClientIP,
-		YourClientIP: dp.DHCP.YourClientIP,
+		YourClientIP: lease.Ip,
+		NextServerIP: server.config.MyAddress,
 	}
 	resp.Options = append(resp.Options, layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(layers.DHCPMsgTypeOffer)}))
 	return resp
@@ -48,6 +51,7 @@ func (dp *DP) OfferResponse(lease *config.Lease, server *DhcpServer) *layers.DHC
 
 func (dp *DP) NakResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv4 {
 	return &layers.DHCPv4{
+		Xid:          dp.DHCP.Xid,
 		Operation:    layers.DHCPOp(layers.DHCPMsgTypeOffer),
 		HardwareType: dp.DHCP.HardwareType,
 		ClientHWAddr: dp.DHCP.ClientHWAddr,
@@ -66,8 +70,8 @@ func (dp *DP) AckResponse(lease *config.Lease, server *DhcpServer) *layers.DHCPv
 		Xid:          dp.DHCP.Xid,
 		HardwareType: dp.DHCP.HardwareType,
 		ClientHWAddr: dp.DHCP.ClientHWAddr,
-		ClientIP:     lease.Ip,
-		YourClientIP: dp.DHCP.YourClientIP,
+		ClientIP:     dp.DHCP.ClientIP,
+		YourClientIP: lease.Ip,
 		Options:      dp.getOptions(lease, server),
 	}
 	resp.Options = append(resp.Options, layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(layers.DHCPMsgTypeAck)}))

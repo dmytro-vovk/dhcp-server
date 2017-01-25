@@ -8,12 +8,13 @@ import (
 	"net"
 	"syscall"
 
+	"time"
+
 	"github.com/dmitry-vovk/dhcp-server/src/config"
 	"github.com/dmitry-vovk/dhcp-server/src/raw_packet"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"time"
 )
 
 type DhcpServer struct {
@@ -97,12 +98,6 @@ func (s *DhcpServer) respond(p *DP) {
 		if err != nil {
 			log.Fatalf("Sendto failed: %s", err)
 		}
-	} else {
-		log.Printf(
-			"Not responding to %s (vlan %s)",
-			p.SrcMac,
-			s.vlanList(p),
-		)
 	}
 }
 
@@ -111,12 +106,14 @@ func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 		switch {
 		case p.DHCP.ClientIP.Equal(net.IPv4zero):
 			return s.prepareOffer(p, lease)
-		case lease.Ip.Equal(p.DHCP.YourClientIP) || lease.Ip.Equal(p.DHCP.ClientIP):
+		case p.DHCP.ClientIP.Equal(lease.Ip):
 			return s.prepareAck(p, lease)
+		default:
+			log.Printf("NAK: client wants %s, got %s", p.DHCP.YourClientIP, lease.Ip)
+			return s.prepareNak(p, lease)
 		}
-		log.Printf("NAK: client wants %s, got %s", p.DHCP.YourClientIP, lease.Ip)
-		return s.prepareNak(p, lease)
 	}
+	log.Printf("No lease defined for %s in vlan %s", p.DHCP.ClientHWAddr, s.vlanList(p))
 	return nil
 }
 
