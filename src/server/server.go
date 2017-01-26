@@ -78,7 +78,7 @@ func (s *DhcpServer) run() {
 	}
 }
 
-func (s *DhcpServer) getRequestType(p *DP) byte {
+func (s *DhcpServer) getRequestType(p *DP) layers.DHCPOpt {
 	for _, o := range p.DHCP.Options {
 		if o.Type == layers.DHCPOptMessageType && len(o.Data) > 0 {
 			return o.Data[0]
