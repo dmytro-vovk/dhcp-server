@@ -64,10 +64,13 @@ func (s *DhcpServer) run() {
 			fmt.Printf("Error parsing incoming packet: %s", err)
 			continue
 		}
+		if p.DHCP.Operation != layers.DHCPOpRequest {
+			continue
+		}
 		s.respond(p)
 		log.Printf(
 			"%s from mac %s, ip %s (%s), vlan %s",
-			s.getRequestType(p),
+			layers.DHCPMsgType(s.getRequestType(p)).String(),
 			p.SrcMac,
 			p.SrcIP,
 			p.DHCP.YourClientIP,
@@ -75,24 +78,26 @@ func (s *DhcpServer) run() {
 	}
 }
 
-func (s *DhcpServer) getRequestType(p *DP) string {
+func (s *DhcpServer) getRequestType(p *DP) byte {
 	for _, o := range p.DHCP.Options {
 		if o.Type == layers.DHCPOptMessageType && len(o.Data) > 0 {
-			return layers.DHCPMsgType(o.Data[0]).String()
+			return o.Data[0]
 		}
 	}
-	return layers.DHCPMsgType(0).String()
+	return 0
+}
+
+func (s *DhcpServer) getRequestedIP(p *DP) net.IP {
+	for _, o := range p.DHCP.Options {
+		if o.Type == layers.DHCPOptRequestIP && len(o.Data) == 4 {
+			return net.IP(o.Data)
+		}
+	}
+	return net.IP{}
 }
 
 func (s *DhcpServer) respond(p *DP) {
-	var response *raw_packet.RawPacket
-	switch p.DHCP.Operation {
-	case layers.DHCPOpRequest:
-		response = s.processRequest(p)
-	default:
-		log.Printf("Request %q not yet implemented", p.DHCP.Operation)
-	}
-	if response != nil {
+	if response := s.processRequest(p); response != nil {
 		log.Printf(
 			"%s to %s (vlan %s): %s (%d ms)",
 			response.DhcpType,
@@ -112,11 +117,15 @@ func (s *DhcpServer) respond(p *DP) {
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	if lease := s.getLease(p); lease != nil {
-		switch {
-		case p.DHCP.ClientIP.Equal(net.IPv4zero):
+		switch s.getRequestType(p) {
+		case layers.DHCPMsgTypeDiscover:
 			return s.prepareOffer(p, lease)
-		case p.DHCP.ClientIP.Equal(lease.Ip):
-			return s.prepareAck(p, lease)
+		case layers.DHCPMsgTypeRequest:
+			if s.getRequestedIP(p).Equal(lease.Ip) {
+				return s.prepareAck(p, lease)
+			} else {
+				return s.prepareNak(p, lease)
+			}
 		default:
 			log.Printf("NAK: client wants %s, got %s", p.DHCP.YourClientIP, lease.Ip)
 			return s.prepareNak(p, lease)
