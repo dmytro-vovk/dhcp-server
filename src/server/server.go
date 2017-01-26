@@ -67,7 +67,6 @@ func (s *DhcpServer) run() {
 		if p.DHCP.Operation != layers.DHCPOpRequest {
 			continue
 		}
-		s.respond(p)
 		log.Printf(
 			"%s from mac %s, ip %s (%s), vlan %s",
 			layers.DHCPMsgType(s.getRequestType(p)).String(),
@@ -75,6 +74,7 @@ func (s *DhcpServer) run() {
 			p.SrcIP,
 			s.getRequestedIP(p),
 			s.vlanList(p))
+		s.respond(p)
 	}
 }
 
