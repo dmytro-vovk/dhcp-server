@@ -73,7 +73,7 @@ func (s *DhcpServer) run() {
 			layers.DHCPMsgType(s.getRequestType(p)).String(),
 			p.SrcMac,
 			p.SrcIP,
-			p.DHCP.YourClientIP,
+			s.getRequestedIP(p),
 			s.vlanList(p))
 	}
 }
