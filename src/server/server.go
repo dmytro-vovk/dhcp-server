@@ -81,10 +81,10 @@ func (s *DhcpServer) run() {
 func (s *DhcpServer) getRequestType(p *DP) layers.DHCPOpt {
 	for _, o := range p.DHCP.Options {
 		if o.Type == layers.DHCPOptMessageType && len(o.Data) > 0 {
-			return o.Data[0]
+			return layers.DHCPOpt(o.Data[0])
 		}
 	}
-	return 0
+	return layers.DHCPOptPad
 }
 
 func (s *DhcpServer) getRequestedIP(p *DP) net.IP {
