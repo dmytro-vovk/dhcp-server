@@ -117,7 +117,7 @@ func (s *DhcpServer) respond(p *DP) {
 
 func (s *DhcpServer) processRequest(p *DP) *raw_packet.RawPacket {
 	if lease := s.getLease(p); lease != nil {
-		switch s.getRequestType(p) {
+		switch layers.DHCPMsgType(s.getRequestType(p)) {
 		case layers.DHCPMsgTypeDiscover:
 			return s.prepareOffer(p, lease)
 		case layers.DHCPMsgTypeRequest:
