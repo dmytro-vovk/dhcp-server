@@ -89,7 +89,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		}
 		ip, ipn, err := net.ParseCIDR(lease.Ip)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error parsing CIDR: %s", err)
 		}
 		ip = ip.To4()
 		broadcast := net.IPv4(ip[0]|(^ipn.Mask[0]), ip[1]|(^ipn.Mask[1]), ip[2]|(^ipn.Mask[2]), ip[3]|(^ipn.Mask[3])).To4()
@@ -98,7 +98,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		if lease.Mac != "" {
 			mac, err = net.ParseMAC(lease.Mac)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("Error parsing MAC: %s", err)
 			}
 		}
 		vl.Mac = mac.String()

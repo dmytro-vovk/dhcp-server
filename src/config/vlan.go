@@ -30,7 +30,7 @@ func (v *VLanMac) Set(vlans []*layers.Dot1Q, mac net.HardwareAddr) *VLanMac {
 }
 
 func (v VLanMac) String() string {
-	vv := []string{}
+	var vv []string
 	for _, vl := range v.L {
 		vv = append(vv, strconv.Itoa(int(vl)))
 	}

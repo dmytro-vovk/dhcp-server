@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"syscall"
-
 	"time"
 
 	"github.com/dmitry-vovk/dhcp-server/src/config"

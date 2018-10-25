@@ -19,7 +19,7 @@ func init() {
 	var err error
 	conf, err = config.Read(*configFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error reading config file: %s", err)
 	}
 	log.Printf("Config read from %s", *configFile)
 	log.Printf("Will serve %d clients", len(conf.Leases)+len(conf.VLans))
