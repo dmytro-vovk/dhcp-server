@@ -66,6 +66,11 @@ func (s *DhcpServer) run() {
 		if p.DHCP.Operation != layers.DHCPOpRequest {
 			continue
 		}
+		if s.config.IgnoreStrangeVLans {
+			if _, ok := s.config.VLanIDs[p.VlanString()]; !ok {
+				continue
+			}
+		}
 		log.Printf(
 			"%s from mac %s, ip %s (%s), vlan %s",
 			layers.DHCPMsgType(s.getRequestType(p)).String(),

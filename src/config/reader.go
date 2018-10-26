@@ -12,12 +12,14 @@ import (
 )
 
 type rawServerConfig struct {
-	Listen      string              `json:"listen on"`
-	MyAddress   string              `json:"my address"`
-	LeaseTime   uint                `json:"default lease time"`
-	NameServers []string            `json:"name servers"`
-	TimeOffset  uint16              `json:"time offset"`
-	Leases      map[string]rawLease `json:"leases"`
+	Listen               string              `json:"listen on"`              // Interface to listen on
+	MyAddress            string              `json:"my address"`             // My own address
+	LeaseTime            uint                `json:"default lease time"`     // In seconds
+	TimeOffset           uint16              `json:"time offset"`            // In seconds
+	IgnoreStrangeClients bool                `json:"ignore strange clients"` // Do not respond to unknown clients
+	IgnoreStrangeVLans   bool                `json:"ignore strange vlans"`   // Do not respond on unknown vlans
+	NameServers          []string            `json:"name servers"`           // List of nameservers in textual form: X.X.X.X
+	Leases               map[string]rawLease `json:"leases"`                 // Leases definitions
 }
 
 type rawLease struct {
@@ -28,15 +30,18 @@ type rawLease struct {
 }
 
 type ServerConfig struct {
-	Listen         string
-	MyAddress      net.IP
-	MyMac          net.HardwareAddr
-	LeaseTime      time.Duration
-	LeaseTimeBytes []byte
-	NameServers    []byte
-	TimeOffset     uint16
-	Leases         map[string]Lease
-	VLans          map[string]Lease
+	Listen               string
+	MyAddress            net.IP
+	MyMac                net.HardwareAddr
+	LeaseTime            time.Duration
+	LeaseTimeBytes       []byte
+	NameServers          []byte
+	TimeOffset           uint16
+	IgnoreStrangeClients bool
+	IgnoreStrangeVLans   bool
+	Leases               map[string]Lease
+	VLans                map[string]Lease
+	VLanIDs              map[string]struct{}
 }
 
 type Lease struct {
@@ -63,14 +68,17 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	conf := &ServerConfig{
-		Listen:         c.Listen,
-		Leases:         make(map[string]Lease),
-		VLans:          make(map[string]Lease),
-		LeaseTime:      time.Duration(c.LeaseTime) * time.Second,
-		LeaseTimeBytes: make([]byte, 4),
-		MyAddress:      net.ParseIP(c.MyAddress).To4(),
-		TimeOffset:     c.TimeOffset,
+	conf := ServerConfig{
+		Listen:               c.Listen,
+		Leases:               make(map[string]Lease),
+		VLans:                make(map[string]Lease),
+		LeaseTime:            time.Duration(c.LeaseTime) * time.Second,
+		LeaseTimeBytes:       make([]byte, 4),
+		MyAddress:            net.ParseIP(c.MyAddress).To4(),
+		TimeOffset:           c.TimeOffset,
+		IgnoreStrangeClients: c.IgnoreStrangeClients,
+		IgnoreStrangeVLans:   c.IgnoreStrangeVLans,
+		VLanIDs:              make(map[string]struct{}),
 	}
 	binary.BigEndian.PutUint32(conf.LeaseTimeBytes, uint32(conf.LeaseTime/time.Second))
 	for _, ns := range c.NameServers {
@@ -103,6 +111,7 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 		}
 		vl.Mac = mac.String()
 		if lease.VLan != "" {
+			conf.VLanIDs[lease.VLan] = struct{}{}
 			if strings.Contains(lease.VLan, ".") {
 				for _, l := range strings.Split(lease.VLan, ".") {
 					id, err := strconv.Atoi(l)
@@ -139,5 +148,5 @@ func parse(c *rawServerConfig, err error) (*ServerConfig, error) {
 			}
 		}
 	}
-	return conf, nil
+	return &conf, nil
 }

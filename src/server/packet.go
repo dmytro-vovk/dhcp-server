@@ -2,6 +2,8 @@ package server
 
 import (
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dmitry-vovk/dhcp-server/src/config"
@@ -20,6 +22,14 @@ type DP struct {
 	DstPort   layers.UDPPort
 	OpCode    byte
 	DHCP      *layers.DHCPv4
+}
+
+func (dp *DP) VlanString() string {
+	s := ""
+	for _, vl := range dp.VLan {
+		s += strconv.Itoa(int(vl.VLANIdentifier)) + "."
+	}
+	return strings.TrimRight(s, ".")
 }
 
 func (dp *DP) getOptions(lease *config.Lease, server *DhcpServer) layers.DHCPOptions {
